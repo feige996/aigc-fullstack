@@ -1,0 +1,25 @@
+{
+  "name": "@aigc/admin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5174",
+    "build": "vue-tsc -b --noEmit && vite build",
+    "lint": "vue-tsc -b --noEmit",
+    "test": "echo \"No tests yet\"",
+    "typecheck": "vue-tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "element-plus": "^2.9.10",
+    "vite": "^6.3.5",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.1",
+    "pinia": "^3.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vue-tsc": "^2.2.10"
+  }
+}

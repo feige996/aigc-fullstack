@@ -1,0 +1,23 @@
+[project]
+name = "aigc-ai-service"
+version = "0.0.0"
+description = "FastAPI AI service and worker runtime for AIGC tasks."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115.12",
+  "uvicorn[standard]>=0.34.2",
+  "pydantic>=2.11.4"
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.5",
+  "ruff>=0.11.8"
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
