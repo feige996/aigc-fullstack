@@ -4,7 +4,9 @@ version = "0.0.0"
 description = "FastAPI AI service and worker runtime for AIGC tasks."
 requires-python = ">=3.12"
 dependencies = [
+  "aio-pika>=9.5.5",
   "fastapi>=0.115.12",
+  "pydantic-settings>=2.10.1",
   "uvicorn[standard]>=0.34.2",
   "pydantic>=2.11.4"
 ]
