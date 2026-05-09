@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model GenerationTask {
+  id               String                   @id @default(cuid())
+  userId           String                   @map("user_id")
+  projectId        String?                  @map("project_id")
+  type             String
+  model            String
+  status           GenerationTaskStatus
+  stage            GenerationTaskStage
+  failureCode      FailureCode?             @map("failure_code")
+  billingStatus    BillingStatus            @map("billing_status")
+  currentAttemptId String?                  @unique @map("current_attempt_id")
+  maxAttempts      Int                      @default(3) @map("max_attempts")
+  requestPayload   Json                     @map("request_payload")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+  completedAt      DateTime?                @map("completed_at")
+
+  attempts       GenerationTaskAttempt[]    @relation("TaskAttempts")
+  currentAttempt GenerationTaskAttempt?     @relation("CurrentAttempt", fields: [currentAttemptId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([model, createdAt])
+  @@index([failureCode, createdAt])
+  @@map("generation_tasks")
+}
+
+model GenerationTaskAttempt {
+  id                 String               @id @default(cuid())
+  taskId             String               @map("task_id")
+  attemptNo          Int                  @map("attempt_no")
+  status             AttemptStatus
+  stage              GenerationTaskStage
+  provider           String?
+  providerTaskId     String?              @map("provider_task_id")
+  failureCode        FailureCode?         @map("failure_code")
+  retryable          Boolean              @default(true)
+  idempotencyKey     String               @unique @map("idempotency_key")
+  requestPayloadHash String               @map("request_payload_hash")
+  rawError           Json?                @map("raw_error")
+  startedAt          DateTime?            @map("started_at")
+  endedAt            DateTime?            @map("ended_at")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  task          GenerationTask  @relation("TaskAttempts", fields: [taskId], references: [id])
+  currentForTask GenerationTask? @relation("CurrentAttempt")
+
+  @@unique([taskId, attemptNo])
+  @@index([taskId, status])
+  @@index([provider, providerTaskId])
+  @@index([failureCode, createdAt])
+  @@map("generation_task_attempts")
+}
+
+enum GenerationTaskStatus {
+  draft
+  validating
+  rejected
+  pending
+  queued
+  running
+  retrying
+  succeeded
+  failed
+  final_failed
+  canceled
+  expired
+}
+
+enum AttemptStatus {
+  pending
+  queued
+  running
+  succeeded
+  failed
+  canceled
+}
+
+enum GenerationTaskStage {
+  input_validation
+  text_moderation
+  asset_moderation
+  quota_check
+  billing_freeze
+  queue_publish
+  model_dispatch
+  model_waiting
+  model_generating
+  result_fetching
+  media_processing
+  result_moderation
+  asset_uploading
+  billing_confirm
+  completed
+}
+
+enum BillingStatus {
+  none
+  freezing
+  frozen
+  freeze_failed
+  confirming
+  confirmed
+  releasing
+  released
+  refunding
+  refunded
+  adjust_required
+}
+
+enum FailureCode {
+  INPUT_INVALID
+  PROMPT_SENSITIVE
+  TEXT_MODERATION_REJECTED
+  ASSET_MODERATION_REJECTED
+  RESULT_MODERATION_REJECTED
+  QUOTA_NOT_ENOUGH
+  BILLING_FREEZE_FAILED
+  QUEUE_PUBLISH_FAILED
+  WORKER_TIMEOUT
+  PROVIDER_TIMEOUT
+  PROVIDER_RATE_LIMITED
+  PROVIDER_REJECTED
+  PROVIDER_FAILED
+  MEDIA_PROCESS_FAILED
+  ASSET_UPLOAD_FAILED
+  CALLBACK_FAILED
+  BILLING_CONFIRM_FAILED
+  USER_CANCELED
+  SYSTEM_CANCELED
+  UNKNOWN_ERROR
+}
