@@ -10,10 +10,10 @@ export const generationTaskStatuses = [
   'failed',
   'final_failed',
   'canceled',
-  'expired'
-] as const
+  'expired',
+] as const;
 
-export type GenerationTaskStatus = (typeof generationTaskStatuses)[number]
+export type GenerationTaskStatus = (typeof generationTaskStatuses)[number];
 
 export const generationTaskStages = [
   'input_validation',
@@ -30,10 +30,10 @@ export const generationTaskStages = [
   'result_moderation',
   'asset_uploading',
   'billing_confirm',
-  'completed'
-] as const
+  'completed',
+] as const;
 
-export type GenerationTaskStage = (typeof generationTaskStages)[number]
+export type GenerationTaskStage = (typeof generationTaskStages)[number];
 
 export const billingStatuses = [
   'none',
@@ -46,10 +46,10 @@ export const billingStatuses = [
   'released',
   'refunding',
   'refunded',
-  'adjust_required'
-] as const
+  'adjust_required',
+] as const;
 
-export type BillingStatus = (typeof billingStatuses)[number]
+export type BillingStatus = (typeof billingStatuses)[number];
 
 export const assetStatuses = [
   'temporary',
@@ -58,14 +58,14 @@ export const assetStatuses = [
   'blocked',
   'deleted',
   'expired',
-  'orphaned'
-] as const
+  'orphaned',
+] as const;
 
-export type AssetStatus = (typeof assetStatuses)[number]
+export type AssetStatus = (typeof assetStatuses)[number];
 
-export const moderationStatuses = ['pending', 'passed', 'rejected', 'manual_review'] as const
+export const moderationStatuses = ['pending', 'passed', 'rejected', 'manual_review'] as const;
 
-export type ModerationStatus = (typeof moderationStatuses)[number]
+export type ModerationStatus = (typeof moderationStatuses)[number];
 
 export const failureCodes = [
   'INPUT_INVALID',
@@ -87,16 +87,16 @@ export const failureCodes = [
   'BILLING_CONFIRM_FAILED',
   'USER_CANCELED',
   'SYSTEM_CANCELED',
-  'UNKNOWN_ERROR'
-] as const
+  'UNKNOWN_ERROR',
+] as const;
 
-export type FailureCode = (typeof failureCodes)[number]
+export type FailureCode = (typeof failureCodes)[number];
 
 export const rabbitExchanges = {
   generationRequest: 'generation.request',
   generationResult: 'generation.result',
-  generationDeadLetter: 'generation.dead-letter'
-} as const
+  generationDeadLetter: 'generation.dead-letter',
+} as const;
 
 export const rabbitRoutingKeys = {
   imageGenerate: 'image.generate',
@@ -105,8 +105,34 @@ export const rabbitRoutingKeys = {
   imageInpaint: 'image.inpaint',
   taskSucceeded: 'task.succeeded',
   taskFailed: 'task.failed',
-  taskProgress: 'task.progress'
-} as const
+  taskProgress: 'task.progress',
+} as const;
+
+export const rabbitQueues = {
+  imageGenerate: 'image.generate.queue',
+  videoGenerate: 'video.generate.queue',
+  imageUpscale: 'image.upscale.queue',
+  imageInpaint: 'image.inpaint.queue',
+  generationResultPersist: 'generation.result.persist.queue',
+  generationFailed: 'generation.failed.queue',
+} as const;
+
+export interface GenerationRequestMessage {
+  traceId: string;
+  taskId: string;
+  attemptId: string;
+  userId: string;
+  type: string;
+  model: string;
+  input: {
+    prompt: string;
+    ratio?: string;
+    duration?: number;
+    referenceAssetIds: string[];
+  };
+  idempotencyKey: string;
+  attempt: number;
+}
 
 export const sseEvents = {
   taskQueued: 'task.queued',
@@ -115,5 +141,5 @@ export const sseEvents = {
   taskSucceeded: 'task.succeeded',
   taskFailed: 'task.failed',
   taskCanceled: 'task.canceled',
-  quotaUpdated: 'quota.updated'
-} as const
+  quotaUpdated: 'quota.updated',
+} as const;
