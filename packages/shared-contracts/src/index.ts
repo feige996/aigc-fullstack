@@ -134,6 +134,31 @@ export interface GenerationRequestMessage {
   attempt: number;
 }
 
+export interface GenerationResultMessage {
+  traceId: string;
+  taskId: string;
+  attemptId: string;
+  status: 'succeeded' | 'failed';
+  provider: string;
+  outputs: Array<{
+    type: 'image' | 'video';
+    objectPath: string;
+    previewUrl?: string;
+    width?: number;
+    height?: number;
+    duration?: number;
+  }>;
+  usage?: {
+    cost: number;
+    unit: 'credits' | 'money';
+  };
+  error?: {
+    code: string;
+    message: string;
+    retryable: boolean;
+  } | null;
+}
+
 export const sseEvents = {
   taskQueued: 'task.queued',
   taskRunning: 'task.running',

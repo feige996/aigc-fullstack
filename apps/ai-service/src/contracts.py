@@ -18,3 +18,28 @@ class GenerationRequestMessage(BaseModel):
     input: GenerationInput
     idempotency_key: str = Field(alias="idempotencyKey")
     attempt: int
+
+
+class GenerationResultOutput(BaseModel):
+    type: str
+    object_path: str = Field(alias="objectPath")
+    preview_url: str | None = Field(default=None, alias="previewUrl")
+    width: int | None = None
+    height: int | None = None
+    duration: int | None = None
+
+
+class GenerationResultUsage(BaseModel):
+    cost: int
+    unit: str
+
+
+class GenerationResultMessage(BaseModel):
+    trace_id: str = Field(alias="traceId")
+    task_id: str = Field(alias="taskId")
+    attempt_id: str = Field(alias="attemptId")
+    status: str
+    provider: str
+    outputs: list[GenerationResultOutput]
+    usage: GenerationResultUsage | None = None
+    error: dict | None = None

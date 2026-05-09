@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common'
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { rabbitExchanges, rabbitQueues, rabbitRoutingKeys } from '@aigc/shared-contracts'
 import * as amqp from 'amqplib'
@@ -11,6 +11,7 @@ interface PublishJsonInput {
 
 @Injectable()
 export class RabbitmqService implements OnModuleDestroy {
+  private readonly logger = new Logger(RabbitmqService.name)
   private connection?: amqp.ChannelModel
   private channel?: amqp.Channel
 
@@ -36,6 +37,33 @@ export class RabbitmqService implements OnModuleDestroy {
     if (!published) {
       throw new Error(`RabbitMQ publish buffer is full for ${exchange}:${routingKey}`)
     }
+  }
+
+  async consumeGenerationResults(handler: (message: unknown) => Promise<void>) {
+    const channel = await this.getChannel()
+
+    await this.assertGenerationResultTopology(channel)
+
+    await channel.consume(
+      rabbitQueues.generationResultPersist,
+      async (message) => {
+        if (!message) {
+          return
+        }
+
+        try {
+          const payload = JSON.parse(message.content.toString('utf-8')) as unknown
+          await handler(payload)
+          channel.ack(message)
+        } catch (error) {
+          this.logger.error('Failed to handle generation result message', error)
+          channel.nack(message, false, false)
+        }
+      },
+      {
+        noAck: false
+      }
+    )
   }
 
   async onModuleDestroy() {
@@ -71,6 +99,30 @@ export class RabbitmqService implements OnModuleDestroy {
       rabbitRoutingKeys.imageGenerate
     )
 
+    await this.assertGenerationResultTopology(this.channel)
+
     return this.channel
+  }
+
+  private async assertGenerationResultTopology(channel: amqp.Channel) {
+    await channel.assertExchange(rabbitExchanges.generationResult, 'direct', {
+      durable: true
+    })
+
+    await channel.assertQueue(rabbitQueues.generationResultPersist, {
+      durable: true
+    })
+
+    await channel.bindQueue(
+      rabbitQueues.generationResultPersist,
+      rabbitExchanges.generationResult,
+      rabbitRoutingKeys.taskSucceeded
+    )
+
+    await channel.bindQueue(
+      rabbitQueues.generationResultPersist,
+      rabbitExchanges.generationResult,
+      rabbitRoutingKeys.taskFailed
+    )
   }
 }
