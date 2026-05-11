@@ -33,16 +33,16 @@ Auth
 Admin
   后台入口、用户管理、角色权限
 
-Project / Workspace
+Project
   项目空间、资源归属边界
 
-Asset / File
+Asset
   文件上传、对象存储、签名 URL、资产元数据
 
-Task / Job
+Task
   异步任务、状态、attempt、失败重试、结果记录
 
-Provider / Adapter
+Provider
   外部能力适配，例如 AI、支付、搜索、通知、OCR、文档解析
 
 Workflow
@@ -207,9 +207,13 @@ task_attempts
 }
 ```
 
-## Provider 不等于 AI Model
+## Provider 不等于 Adapter
 
-Provider 是外部能力适配器，不只包括模型供应商。
+Provider 是系统中的“能力提供方”概念，Adapter 是某个 Provider 的代码适配实现。
+
+因此 core 模块命名保留 `Provider`，不使用 `Provider / Adapter` 这种并列命名。
+
+Provider 不只包括模型供应商。
 
 可以包括：
 
