@@ -274,6 +274,6 @@ search
 下一步适合做：
 
 1. 在 `shared-contracts` 中加入通用 `taskDomains`、`taskTypes`、`providerCapabilities`。
-2. 在现有 generation 消息中兼容性增加 `domain` 和 `capability`。
-3. 新增 `docs/task-contracts.md` 描述通用 task 契约。
+2. 新增 `docs/task-contracts.md` 描述通用 task 契约。
+3. 暂不修改现有 generation 消息，等出现第二个业务模块后再落运行时字段。
 4. 未来新增业务时，放在 `features/*`，不要继续扩展 `generation` 命名。

@@ -149,6 +149,7 @@ apps/ai-service FastAPI Worker
 - [文档写作约定](./docs/documentation-style-guide.md)
 - [Platform Core 架构边界](./docs/platform-core-architecture.md)
 - [通用智能项目平台演进路线](./docs/generalized-platform-roadmap.md)
+- [Task 契约设计](./docs/task-contracts.md)
 - [本地浏览器验证](./docs/local-browser-verification.md)
 - [认证账户模型](./docs/auth-account-model.md)
 - [Monorepo 总体架构](./docs/aigc-monorepo-architecture.md)

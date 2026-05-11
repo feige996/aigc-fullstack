@@ -107,6 +107,43 @@ export const failureCodes = [
 
 export type FailureCode = (typeof failureCodes)[number];
 
+export const taskDomains = [
+  'default',
+  'aigc_generation',
+  'novel_analysis',
+  'document_analysis',
+] as const;
+
+export type TaskDomain = (typeof taskDomains)[number];
+
+export const taskTypes = [
+  'generic_task',
+  'text_to_image',
+  'image_to_image',
+  'image_upscale',
+  'video_generation',
+  'novel_profile_analysis',
+  'document_summary',
+  'document_risk_analysis',
+] as const;
+
+export type TaskType = (typeof taskTypes)[number];
+
+export const providerCapabilities = [
+  'generic_execution',
+  'image_generation',
+  'video_generation',
+  'image_processing',
+  'text_analysis',
+  'document_parsing',
+  'relationship_extraction',
+  'payment',
+  'notification',
+  'search',
+] as const;
+
+export type ProviderCapability = (typeof providerCapabilities)[number];
+
 export const rabbitExchanges = {
   generationRequest: 'generation.request',
   generationResult: 'generation.result',
