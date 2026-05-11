@@ -15,6 +15,10 @@ type TaskStatus =
   | 'canceled'
   | 'expired'
 
+type UserRole = 'user' | 'admin' | 'super_admin'
+type UserStatus = 'active' | 'disabled'
+type ActiveView = 'tasks' | 'users'
+
 interface GenerationAttempt {
   id: string
   attemptNo: number
@@ -65,6 +69,16 @@ interface StoredAuth {
   refreshToken: string
 }
 
+interface AdminUser {
+  id: string
+  phoneNumber: string
+  displayName: string | null
+  role: UserRole
+  status: UserStatus
+  createdAt: string
+  updatedAt: string
+}
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.admin.auth'
@@ -75,12 +89,16 @@ const storedAuth = readStoredAuth()
 const accessToken = ref(storedAuth.accessToken)
 const refreshToken = ref(storedAuth.refreshToken)
 const currentUser = ref<AuthResponse['user'] | null>(null)
+const activeView = ref<ActiveView>('tasks')
 const tasks = ref<GenerationTask[]>([])
 const selectedTask = ref<GenerationTask | null>(null)
+const users = ref<AdminUser[]>([])
 const isLoading = ref(false)
+const isLoadingUsers = ref(false)
 const isRetrying = ref(false)
 const isCanceling = ref(false)
 const isChangingPassword = ref(false)
+const updatingUserIds = ref(new Set<string>())
 const errorMessage = ref('')
 const successMessage = ref('')
 const currentPassword = ref('')
@@ -92,6 +110,15 @@ const failedTasks = computed(
 )
 const succeededTasks = computed(() => tasks.value.filter((task) => task.status === 'succeeded').length)
 const isAuthenticated = computed(() => Boolean(accessToken.value))
+const isSuperAdmin = computed(() => currentUser.value?.role === 'super_admin')
+const pageTitle = computed(() => (activeView.value === 'users' ? 'Users' : 'Generation Tasks'))
+const pageDescription = computed(() => {
+  if (!currentUser.value) {
+    return 'Inspect task state, attempts, and failure signals.'
+  }
+
+  return `Signed in as ${currentUser.value.phoneNumber}`
+})
 
 function readStoredAuth(): StoredAuth {
   const rawValue = localStorage.getItem(authStorageKey)
@@ -167,7 +194,7 @@ async function authenticate(mode: 'login' | 'register') {
     }
 
     storeAuth(result)
-    await loadTasks()
+    await loadCurrentView()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : `${mode} failed`
   }
@@ -263,9 +290,32 @@ async function signOut(callServer = true) {
   accessToken.value = ''
   refreshToken.value = ''
   currentUser.value = null
+  activeView.value = 'tasks'
   tasks.value = []
   selectedTask.value = null
+  users.value = []
   localStorage.removeItem(authStorageKey)
+}
+
+async function loadCurrentView() {
+  if (activeView.value === 'users') {
+    await loadUsers()
+    return
+  }
+
+  await loadTasks()
+}
+
+async function setActiveView(view: ActiveView) {
+  activeView.value = view
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  if (!isAuthenticated.value) {
+    return
+  }
+
+  await loadCurrentView()
 }
 
 async function loadTasks() {
@@ -294,6 +344,81 @@ async function loadTasks() {
     errorMessage.value = error instanceof Error ? error.message : 'Load tasks failed'
   } finally {
     isLoading.value = false
+  }
+}
+
+async function loadUsers() {
+  if (!accessToken.value) {
+    return
+  }
+
+  isLoadingUsers.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const response = await apiFetch('/admin/users')
+
+    if (!response.ok) {
+      throw new Error(`Load users failed: ${response.status}`)
+    }
+
+    const result = (await response.json()) as { items: AdminUser[] }
+    users.value = result.items
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Load users failed'
+  } finally {
+    isLoadingUsers.value = false
+  }
+}
+
+async function updateUserStatus(user: AdminUser, status: UserStatus) {
+  await updateUser(user.id, `/admin/users/${user.id}/status`, {
+    status
+  })
+}
+
+async function updateUserRole(user: AdminUser, role: UserRole) {
+  await updateUser(user.id, `/admin/users/${user.id}/role`, {
+    role
+  })
+}
+
+async function updateUser(userId: string, path: string, body: Record<string, string>) {
+  updatingUserIds.value = new Set(updatingUserIds.value).add(userId)
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const response = await apiFetch(path, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    })
+
+    if (!response.ok) {
+      throw new Error(`Update user failed: ${response.status}`)
+    }
+
+    const updatedUser = (await response.json()) as AdminUser
+    users.value = users.value.map((user) => (user.id === updatedUser.id ? updatedUser : user))
+    successMessage.value = 'User updated.'
+
+    if (updatedUser.id === currentUser.value?.id) {
+      currentUser.value = {
+        ...currentUser.value,
+        role: updatedUser.role,
+        status: updatedUser.status
+      }
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Update user failed'
+  } finally {
+    const nextUpdatingIds = new Set(updatingUserIds.value)
+    nextUpdatingIds.delete(userId)
+    updatingUserIds.value = nextUpdatingIds
   }
 }
 
@@ -436,7 +561,7 @@ function statusType(status: TaskStatus) {
 
 onMounted(async () => {
   await loadProfile()
-  await loadTasks()
+  await loadCurrentView()
 })
 </script>
 
@@ -445,25 +570,32 @@ onMounted(async () => {
     <el-container class="layout">
       <el-aside width="232px" class="aside">
         <div class="brand">AIGC Admin</div>
-        <el-menu default-active="tasks" background-color="#1f2937" text-color="#d1d5db" active-text-color="#fff">
+        <el-menu
+          :default-active="activeView"
+          background-color="#1f2937"
+          text-color="#d1d5db"
+          active-text-color="#fff"
+          @select="(index: string) => setActiveView(index as ActiveView)"
+        >
           <el-menu-item index="tasks">Tasks</el-menu-item>
+          <el-menu-item index="users">Users</el-menu-item>
         </el-menu>
       </el-aside>
 
       <el-container>
         <el-header class="header">
           <div>
-            <h1>Generation Tasks</h1>
-            <p>
-              <template v-if="currentUser">
-                Signed in as {{ currentUser.phoneNumber }}
-              </template>
-              <template v-else>Inspect task state, attempts, and failure signals.</template>
-            </p>
+            <h1>{{ pageTitle }}</h1>
+            <p>{{ pageDescription }}</p>
           </div>
           <div class="header-actions">
             <el-button v-if="isAuthenticated" @click="signOut()">Sign Out</el-button>
-            <el-button type="primary" :disabled="!isAuthenticated" :loading="isLoading" @click="loadTasks">
+            <el-button
+              type="primary"
+              :disabled="!isAuthenticated"
+              :loading="activeView === 'users' ? isLoadingUsers : isLoading"
+              @click="loadCurrentView"
+            >
               Refresh
             </el-button>
           </div>
@@ -510,6 +642,7 @@ onMounted(async () => {
             </el-form>
           </el-card>
 
+          <template v-if="activeView === 'tasks'">
           <section class="metrics">
             <div>
               <span>Total</span>
@@ -599,6 +732,62 @@ onMounted(async () => {
               </template>
             </el-card>
           </section>
+          </template>
+
+          <template v-else>
+          <el-card shadow="never" class="users-card">
+            <template #header>User Management</template>
+            <el-table v-loading="isLoadingUsers" :data="users" height="560">
+              <el-table-column prop="phoneNumber" label="Phone" width="150" />
+              <el-table-column prop="displayName" label="Name" min-width="150" show-overflow-tooltip />
+              <el-table-column label="Role" width="180">
+                <template #default="{ row }">
+                  <el-select
+                    :model-value="row.role"
+                    size="small"
+                    :disabled="!isSuperAdmin || updatingUserIds.has(row.id)"
+                    @change="(role: UserRole) => updateUserRole(row, role)"
+                  >
+                    <el-option label="User" value="user" />
+                    <el-option label="Admin" value="admin" />
+                    <el-option label="Super Admin" value="super_admin" />
+                  </el-select>
+                </template>
+              </el-table-column>
+              <el-table-column label="Status" width="140">
+                <template #default="{ row }">
+                  <el-tag :type="row.status === 'active' ? 'success' : 'danger'" effect="plain">
+                    {{ row.status }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="createdAt" label="Created" width="220" />
+              <el-table-column label="Actions" width="150" fixed="right">
+                <template #default="{ row }">
+                  <el-button
+                    v-if="row.status === 'active'"
+                    type="danger"
+                    size="small"
+                    :loading="updatingUserIds.has(row.id)"
+                    :disabled="row.id === currentUser?.id"
+                    @click="updateUserStatus(row, 'disabled')"
+                  >
+                    Disable
+                  </el-button>
+                  <el-button
+                    v-else
+                    type="success"
+                    size="small"
+                    :loading="updatingUserIds.has(row.id)"
+                    @click="updateUserStatus(row, 'active')"
+                  >
+                    Enable
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+          </template>
           </template>
         </el-main>
       </el-container>
