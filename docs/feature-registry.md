@@ -24,6 +24,14 @@ aigcGenerationFeature
 
 原因是当前产品仍以 AIGC 生成链路作为可验证主流程。
 
+当前只是 registry 层面声明了 AIGC feature。实际 AIGC 代码仍在原有目录中，尚未迁移到 `features/aigc-generation`。
+
+过渡边界见：
+
+```txt
+docs/aigc-generation-feature.md
+```
+
 ## 单业务模式
 
 如果项目只有一个业务，registry 只保留一个 manifest：
