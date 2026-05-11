@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 type TaskStatus =
   | 'draft'
@@ -52,6 +52,8 @@ const tasks = ref<GenerationTask[]>([])
 const isSubmitting = ref(false)
 const isRefreshing = ref(false)
 const errorMessage = ref('')
+const eventSourceStatus = ref<'connecting' | 'open' | 'closed'>('closed')
+let eventSource: EventSource | null = null
 
 const activeTaskStatusLabel = computed(() => activeTask.value?.status ?? 'idle')
 
@@ -127,8 +129,39 @@ function selectTask(task: GenerationTask) {
   activeTask.value = task
 }
 
+function connectEvents() {
+  eventSource?.close()
+  eventSourceStatus.value = 'connecting'
+  eventSource = new EventSource(`${apiBaseUrl}/generation/tasks/events`)
+
+  eventSource.onopen = () => {
+    eventSourceStatus.value = 'open'
+  }
+
+  eventSource.onerror = () => {
+    eventSourceStatus.value = 'closed'
+  }
+
+  for (const eventName of ['task.queued', 'task.succeeded', 'task.failed']) {
+    eventSource.addEventListener(eventName, (event) => {
+      const payload = JSON.parse(event.data) as { taskId: string }
+
+      if (payload.taskId === activeTaskId.value) {
+        void refreshActiveTask()
+      }
+
+      void loadTasks()
+    })
+  }
+}
+
 onMounted(() => {
   void loadTasks()
+  connectEvents()
+})
+
+onBeforeUnmount(() => {
+  eventSource?.close()
 })
 </script>
 
@@ -144,6 +177,10 @@ onMounted(() => {
           {{ activeTaskStatusLabel }}
         </div>
       </header>
+
+      <div class="event-status">
+        SSE: <strong>{{ eventSourceStatus }}</strong>
+      </div>
 
       <section class="panel">
         <label for="prompt">Prompt</label>

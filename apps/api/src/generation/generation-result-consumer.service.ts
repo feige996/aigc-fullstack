@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import type { GenerationResultMessage } from '@aigc/shared-contracts'
 import { PrismaService } from '../prisma/prisma.service'
 import { RabbitmqService } from '../rabbitmq/rabbitmq.service'
+import { GenerationEventsService } from './generation-events.service'
 
 @Injectable()
 export class GenerationResultConsumerService implements OnModuleInit {
@@ -9,7 +10,8 @@ export class GenerationResultConsumerService implements OnModuleInit {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly rabbitmqService: RabbitmqService
+    private readonly rabbitmqService: RabbitmqService,
+    private readonly generationEvents: GenerationEventsService
   ) {}
 
   async onModuleInit() {
@@ -69,6 +71,12 @@ export class GenerationResultConsumerService implements OnModuleInit {
       })
     })
 
+    this.generationEvents.publishTaskEvent('task.succeeded', {
+      taskId: message.taskId,
+      status: 'succeeded',
+      stage: 'completed'
+    })
+
     this.logger.log(`Marked generation task ${message.taskId} as succeeded`)
   }
 
@@ -108,6 +116,13 @@ export class GenerationResultConsumerService implements OnModuleInit {
           failureCode: 'PROVIDER_FAILED'
         }
       })
+    })
+
+    this.generationEvents.publishTaskEvent('task.failed', {
+      taskId: message.taskId,
+      status: 'failed',
+      stage: 'completed',
+      failureCode: 'PROVIDER_FAILED'
     })
 
     this.logger.log(`Marked generation task ${message.taskId} as failed`)

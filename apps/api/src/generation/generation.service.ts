@@ -3,6 +3,7 @@ import type { GenerationRequestMessage } from '@aigc/shared-contracts'
 import { createHash, randomUUID } from 'node:crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateGenerationTaskDto } from './dto/create-generation-task.dto'
+import { GenerationEventsService } from './generation-events.service'
 import { GenerationPublisherService } from './generation-publisher.service'
 
 interface CreateTaskInput {
@@ -22,6 +23,7 @@ interface GetTaskInput extends UserScopedInput {
 export class GenerationService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly generationEvents: GenerationEventsService,
     private readonly generationPublisher: GenerationPublisherService
   ) {}
 
@@ -122,6 +124,13 @@ export class GenerationService {
         })
       })
 
+      this.generationEvents.publishTaskEvent('task.queued', {
+        taskId: queuedTask.id,
+        status: queuedTask.status,
+        stage: queuedTask.stage,
+        failureCode: queuedTask.failureCode
+      })
+
       return {
         taskId: queuedTask.id,
         attemptId: queuedTask.currentAttempt?.id,
@@ -152,6 +161,13 @@ export class GenerationService {
             currentAttempt: true
           }
         })
+      })
+
+      this.generationEvents.publishTaskEvent('task.failed', {
+        taskId: failedTask.id,
+        status: failedTask.status,
+        stage: failedTask.stage,
+        failureCode: failedTask.failureCode
       })
 
       return {
