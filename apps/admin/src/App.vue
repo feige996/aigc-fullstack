@@ -1,14 +1,211 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+
+type TaskStatus =
+  | 'draft'
+  | 'validating'
+  | 'rejected'
+  | 'pending'
+  | 'queued'
+  | 'running'
+  | 'retrying'
+  | 'succeeded'
+  | 'failed'
+  | 'final_failed'
+  | 'canceled'
+  | 'expired'
+
+interface GenerationAttempt {
+  id: string
+  attemptNo: number
+  status: string
+  stage: string
+  failureCode: string | null
+  idempotencyKey: string
+  createdAt: string
+  updatedAt: string
+  endedAt: string | null
+}
+
+interface GenerationTask {
+  taskId: string
+  userId: string
+  type: string
+  model: string
+  status: TaskStatus
+  stage: string
+  failureCode: string | null
+  billingStatus: string
+  currentAttemptId: string | null
+  requestPayload: {
+    prompt?: string
+    ratio?: string
+  }
+  currentAttempt?: GenerationAttempt
+  attempts?: GenerationAttempt[]
+  createdAt: string
+  updatedAt: string
+  completedAt: string | null
+}
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
+
+const tasks = ref<GenerationTask[]>([])
+const selectedTask = ref<GenerationTask | null>(null)
+const isLoading = ref(false)
+const errorMessage = ref('')
+
+const totalTasks = computed(() => tasks.value.length)
+const failedTasks = computed(
+  () => tasks.value.filter((task) => task.status === 'failed' || task.status === 'final_failed').length
+)
+const succeededTasks = computed(() => tasks.value.filter((task) => task.status === 'succeeded').length)
+
+async function loadTasks() {
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/generation/tasks`)
+
+    if (!response.ok) {
+      throw new Error(`Load tasks failed: ${response.status}`)
+    }
+
+    const result = (await response.json()) as { items: GenerationTask[] }
+    tasks.value = result.items
+
+    if (!selectedTask.value && result.items[0]) {
+      await selectTask(result.items[0])
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Load tasks failed'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function selectTask(task: GenerationTask) {
+  const response = await fetch(`${apiBaseUrl}/generation/tasks/${task.taskId}`)
+
+  if (!response.ok) {
+    selectedTask.value = task
+    return
+  }
+
+  selectedTask.value = (await response.json()) as GenerationTask
+}
+
+function statusType(status: TaskStatus) {
+  if (status === 'succeeded') {
+    return 'success'
+  }
+
+  if (status === 'failed' || status === 'final_failed' || status === 'rejected') {
+    return 'danger'
+  }
+
+  if (status === 'queued' || status === 'running' || status === 'retrying') {
+    return 'warning'
+  }
+
+  return 'info'
+}
+
+onMounted(() => {
+  void loadTasks()
+})
+</script>
+
 <template>
   <el-config-provider>
     <el-container class="layout">
-      <el-aside width="232px" class="aside">AIGC Admin</el-aside>
+      <el-aside width="232px" class="aside">
+        <div class="brand">AIGC Admin</div>
+        <el-menu default-active="tasks" background-color="#1f2937" text-color="#d1d5db" active-text-color="#fff">
+          <el-menu-item index="tasks">Tasks</el-menu-item>
+        </el-menu>
+      </el-aside>
+
       <el-container>
-        <el-header class="header">Operations Console</el-header>
-        <el-main>
-          <el-card shadow="never">
-            <template #header>Dashboard</template>
-            <p>Admin app skeleton.</p>
-          </el-card>
+        <el-header class="header">
+          <div>
+            <h1>Generation Tasks</h1>
+            <p>Inspect task state, attempts, and failure signals.</p>
+          </div>
+          <el-button type="primary" :loading="isLoading" @click="loadTasks">Refresh</el-button>
+        </el-header>
+
+        <el-main class="main">
+          <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon class="alert" />
+
+          <section class="metrics">
+            <div>
+              <span>Total</span>
+              <strong>{{ totalTasks }}</strong>
+            </div>
+            <div>
+              <span>Succeeded</span>
+              <strong>{{ succeededTasks }}</strong>
+            </div>
+            <div>
+              <span>Failed</span>
+              <strong>{{ failedTasks }}</strong>
+            </div>
+          </section>
+
+          <section class="content">
+            <el-card shadow="never" class="table-card">
+              <template #header>Recent Tasks</template>
+              <el-table
+                v-loading="isLoading"
+                :data="tasks"
+                height="520"
+                highlight-current-row
+                @row-click="selectTask"
+              >
+                <el-table-column prop="taskId" label="Task ID" min-width="220" show-overflow-tooltip />
+                <el-table-column prop="model" label="Model" width="160" />
+                <el-table-column label="Status" width="140">
+                  <template #default="{ row }">
+                    <el-tag :type="statusType(row.status)" effect="plain">{{ row.status }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="stage" label="Stage" width="160" />
+                <el-table-column prop="failureCode" label="Failure" width="180" show-overflow-tooltip />
+                <el-table-column prop="updatedAt" label="Updated" width="220" />
+              </el-table>
+            </el-card>
+
+            <el-card shadow="never" class="detail-card">
+              <template #header>Task Detail</template>
+              <el-empty v-if="!selectedTask" description="No task selected" />
+              <template v-else>
+                <el-descriptions :column="1" border>
+                  <el-descriptions-item label="Task ID">{{ selectedTask.taskId }}</el-descriptions-item>
+                  <el-descriptions-item label="User">{{ selectedTask.userId }}</el-descriptions-item>
+                  <el-descriptions-item label="Status">
+                    <el-tag :type="statusType(selectedTask.status)" effect="plain">
+                      {{ selectedTask.status }}
+                    </el-tag>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="Stage">{{ selectedTask.stage }}</el-descriptions-item>
+                  <el-descriptions-item label="Billing">{{ selectedTask.billingStatus }}</el-descriptions-item>
+                  <el-descriptions-item label="Prompt">
+                    {{ selectedTask.requestPayload.prompt }}
+                  </el-descriptions-item>
+                </el-descriptions>
+
+                <h2>Attempts</h2>
+                <el-table :data="selectedTask.attempts ?? []" size="small" border>
+                  <el-table-column prop="attemptNo" label="#" width="56" />
+                  <el-table-column prop="status" label="Status" width="120" />
+                  <el-table-column prop="stage" label="Stage" width="150" />
+                  <el-table-column prop="failureCode" label="Failure" min-width="160" />
+                </el-table>
+              </template>
+            </el-card>
+          </section>
         </el-main>
       </el-container>
     </el-container>
@@ -22,17 +219,88 @@
 }
 
 .aside {
-  padding: 20px;
   color: #fff;
   background: #1f2937;
-  font-weight: 600;
+}
+
+.brand {
+  padding: 20px;
+  font-weight: 700;
 }
 
 .header {
+  height: 76px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   background: #fff;
   border-bottom: 1px solid #e5e7eb;
-  font-weight: 600;
+}
+
+.header h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.header p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.main {
+  display: grid;
+  gap: 16px;
+}
+
+.alert {
+  margin-bottom: -4px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metrics div {
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.metrics span {
+  display: block;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.metrics strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 28px;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(360px, 0.8fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.table-card,
+.detail-card {
+  border-radius: 8px;
+}
+
+.detail-card h2 {
+  margin: 20px 0 10px;
+  font-size: 16px;
+}
+
+@media (max-width: 1100px) {
+  .content {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
