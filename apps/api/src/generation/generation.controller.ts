@@ -2,6 +2,7 @@ import { Body, Controller, Get, MessageEvent as NestMessageEvent, Param, Post, S
 import { Observable } from 'rxjs'
 import { CurrentUser } from '../auth/current-user.decorator'
 import { Public } from '../auth/public.decorator'
+import { Roles } from '../auth/roles.decorator'
 import type { AuthenticatedUser } from '../auth/auth.types'
 import { CreateGenerationTaskDto } from './dto/create-generation-task.dto'
 import { GenerationEventsService } from './generation-events.service'
@@ -25,8 +26,14 @@ export class GenerationController {
   @Get()
   listTasks(@CurrentUser() user: AuthenticatedUser) {
     return this.generationService.listTasks({
-      userId: user.id
+      user
     })
+  }
+
+  @Get('admin')
+  @Roles('admin', 'super_admin')
+  listAdminTasks() {
+    return this.generationService.listAdminTasks()
   }
 
   @Sse('events')
@@ -46,7 +53,7 @@ export class GenerationController {
   @Get(':taskId')
   getTask(@CurrentUser() user: AuthenticatedUser, @Param('taskId') taskId: string) {
     return this.generationService.getTask({
-      userId: user.id,
+      user,
       taskId
     })
   }
@@ -54,7 +61,7 @@ export class GenerationController {
   @Post(':taskId/retry')
   retryTask(@CurrentUser() user: AuthenticatedUser, @Param('taskId') taskId: string) {
     return this.generationService.retryTask({
-      userId: user.id,
+      user,
       taskId
     })
   }
@@ -62,7 +69,7 @@ export class GenerationController {
   @Post(':taskId/cancel')
   cancelTask(@CurrentUser() user: AuthenticatedUser, @Param('taskId') taskId: string) {
     return this.generationService.cancelTask({
-      userId: user.id,
+      user,
       taskId
     })
   }

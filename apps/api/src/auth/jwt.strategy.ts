@@ -1,20 +1,24 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PassportStrategy } from '@nestjs/passport'
 import { ExtractJwt, Strategy } from 'passport-jwt'
+import { PrismaService } from '../prisma/prisma.service'
 import type { AuthenticatedUser } from './auth.types'
 
 interface JwtPayload {
   sub: string
   phoneCountryCode: string
   phoneNumber: string
-  email?: string | null
   role: AuthenticatedUser['role']
+  status: AuthenticatedUser['status']
 }
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(configService: ConfigService) {
+  constructor(
+    configService: ConfigService,
+    private readonly prisma: PrismaService
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -25,13 +29,30 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     })
   }
 
-  validate(payload: JwtPayload): AuthenticatedUser {
+  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: payload.sub
+      },
+      select: {
+        id: true,
+        phoneCountryCode: true,
+        phoneNumber: true,
+        role: true,
+        status: true
+      }
+    })
+
+    if (!user || user.status !== 'active') {
+      throw new UnauthorizedException('User is not active')
+    }
+
     return {
-      id: payload.sub,
-      phoneCountryCode: payload.phoneCountryCode,
-      phoneNumber: payload.phoneNumber,
-      email: payload.email ?? null,
-      role: payload.role
+      id: user.id,
+      phoneCountryCode: user.phoneCountryCode,
+      phoneNumber: user.phoneNumber,
+      role: user.role,
+      status: user.status
     }
   }
 }

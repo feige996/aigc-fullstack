@@ -39,10 +39,10 @@ model User {
   id               String        @id @default(cuid())
   phoneCountryCode String        @default("+86") @map("phone_country_code")
   phoneNumber      String        @map("phone_number")
-  email            String?
   passwordHash     String        @map("password_hash")
   displayName      String?       @map("display_name")
   role             UserRole      @default(user)
+  status           UserStatus    @default(active)
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
@@ -50,8 +50,8 @@ model User {
   refreshTokens   RefreshToken[]
 
   @@unique([phoneCountryCode, phoneNumber])
-  @@unique([email])
   @@index([role, createdAt])
+  @@index([status, createdAt])
   @@map("users")
 }
 
@@ -125,6 +125,12 @@ enum AttemptStatus {
 enum UserRole {
   user
   admin
+  super_admin
+}
+
+enum UserStatus {
+  active
+  disabled
 }
 
 enum GenerationTaskStage {

@@ -49,8 +49,8 @@ interface AuthResponse {
     id: string
     phoneCountryCode: string
     phoneNumber: string
-    email: string | null
     role: string
+    status: string
   }
 }
 
@@ -59,7 +59,6 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/a
 const authStorageKey = 'aigc.web.auth'
 const phoneCountryCode = ref('+86')
 const phoneNumber = ref('13800138000')
-const email = ref('')
 const password = ref('password123')
 const displayName = ref('Demo User')
 const accessToken = ref(localStorage.getItem(authStorageKey) ?? '')
@@ -99,7 +98,6 @@ async function authenticate(mode: 'login' | 'register') {
       body: JSON.stringify({
         phoneCountryCode: phoneCountryCode.value,
         phoneNumber: phoneNumber.value,
-        email: email.value,
         password: password.value,
         displayName: displayName.value
       })
@@ -328,10 +326,6 @@ onBeforeUnmount(() => {
         <label>
           Password
           <input v-model="password" type="password" />
-        </label>
-        <label>
-          Email
-          <input v-model="email" type="email" />
         </label>
         <label>
           Display Name

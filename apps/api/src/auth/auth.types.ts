@@ -1,9 +1,9 @@
-import type { UserRole } from '@prisma/client'
+import type { UserRole, UserStatus } from '@prisma/client'
 
 export interface AuthenticatedUser {
   id: string
   phoneCountryCode: string
   phoneNumber: string
-  email: string | null
   role: UserRole
+  status: UserStatus
 }

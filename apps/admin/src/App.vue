@@ -55,8 +55,8 @@ interface AuthResponse {
     id: string
     phoneCountryCode: string
     phoneNumber: string
-    email: string | null
     role: string
+    status: string
   }
 }
 
@@ -65,7 +65,6 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/a
 const authStorageKey = 'aigc.admin.auth'
 const phoneCountryCode = ref('+86')
 const phoneNumber = ref('13900139000')
-const email = ref('')
 const password = ref('password123')
 const displayName = ref('Admin User')
 const accessToken = ref(localStorage.getItem(authStorageKey) ?? '')
@@ -104,7 +103,6 @@ async function authenticate(mode: 'login' | 'register') {
       body: JSON.stringify({
         phoneCountryCode: phoneCountryCode.value,
         phoneNumber: phoneNumber.value,
-        email: email.value,
         password: password.value,
         displayName: displayName.value
       })
@@ -115,6 +113,11 @@ async function authenticate(mode: 'login' | 'register') {
     }
 
     const result = (await response.json()) as AuthResponse
+
+    if (!['admin', 'super_admin'].includes(result.user.role)) {
+      throw new Error('No admin access')
+    }
+
     accessToken.value = result.accessToken
     currentUser.value = result.user
     localStorage.setItem(authStorageKey, result.accessToken)
@@ -139,6 +142,11 @@ async function loadProfile() {
   }
 
   currentUser.value = (await response.json()) as AuthResponse['user']
+
+  if (!['admin', 'super_admin'].includes(currentUser.value.role)) {
+    signOut()
+    errorMessage.value = 'No admin access'
+  }
 }
 
 function signOut() {
@@ -158,7 +166,7 @@ async function loadTasks() {
   errorMessage.value = ''
 
   try {
-    const response = await fetch(`${apiBaseUrl}/generation/tasks`, {
+    const response = await fetch(`${apiBaseUrl}/generation/tasks/admin`, {
       headers: authHeaders()
     })
 
@@ -332,9 +340,6 @@ onMounted(async () => {
               </el-form-item>
               <el-form-item label="Phone">
                 <el-input v-model="phoneNumber" />
-              </el-form-item>
-              <el-form-item label="Email">
-                <el-input v-model="email" />
               </el-form-item>
               <el-form-item label="Password">
                 <el-input v-model="password" type="password" show-password />

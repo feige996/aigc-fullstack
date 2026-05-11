@@ -11,8 +11,8 @@ interface TokenPairInput {
   id: string
   phoneCountryCode: string
   phoneNumber: string
-  email: string | null
   role: User['role']
+  status: User['status']
 }
 
 interface PhonePasswordInput {
@@ -32,13 +32,11 @@ export class AuthService {
   async register({
     phoneCountryCode,
     phoneNumber,
-    email,
     password,
     displayName
-  }: PhonePasswordInput & { email?: string; displayName?: string }) {
+  }: PhonePasswordInput & { displayName?: string }) {
     const normalizedPhoneCountryCode = this.normalizePhoneCountryCode(phoneCountryCode)
     const normalizedPhoneNumber = this.normalizePhoneNumber(phoneNumber)
-    const normalizedEmail = email ? email.trim().toLowerCase() : undefined
     const passwordHash = await hash(password, 12)
 
     try {
@@ -46,7 +44,6 @@ export class AuthService {
         data: {
           phoneCountryCode: normalizedPhoneCountryCode,
           phoneNumber: normalizedPhoneNumber,
-          email: normalizedEmail,
           passwordHash,
           displayName
         }
@@ -55,7 +52,7 @@ export class AuthService {
       return this.createAuthResponse(user)
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Phone number or email already exists')
+        throw new ConflictException('Phone number already exists')
       }
 
       throw error
@@ -74,6 +71,10 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException('Invalid phone number or password')
+    }
+
+    if (user.status !== 'active') {
+      throw new UnauthorizedException('User is disabled')
     }
 
     const passwordValid = await compare(password, user.passwordHash)
@@ -98,6 +99,10 @@ export class AuthService {
 
     if (!storedToken || storedToken.revokedAt || storedToken.expiresAt.getTime() <= Date.now()) {
       throw new UnauthorizedException('Invalid refresh token')
+    }
+
+    if (storedToken.user.status !== 'active') {
+      throw new UnauthorizedException('User is disabled')
     }
 
     await this.prisma.refreshToken.update({
@@ -133,8 +138,8 @@ export class AuthService {
       id: user.id,
       phoneCountryCode: user.phoneCountryCode,
       phoneNumber: user.phoneNumber,
-      email: user.email,
-      role: user.role
+      role: user.role,
+      status: user.status
     }
   }
 
@@ -144,8 +149,8 @@ export class AuthService {
         sub: user.id,
         phoneCountryCode: user.phoneCountryCode,
         phoneNumber: user.phoneNumber,
-        email: user.email,
-        role: user.role
+        role: user.role,
+        status: user.status
       },
       {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET') ?? 'dev_access_secret',
@@ -174,8 +179,8 @@ export class AuthService {
         id: user.id,
         phoneCountryCode: user.phoneCountryCode,
         phoneNumber: user.phoneNumber,
-        email: user.email,
-        role: user.role
+        role: user.role,
+        status: user.status
       }
     }
   }

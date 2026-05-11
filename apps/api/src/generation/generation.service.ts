@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { CreateGenerationTaskDto } from './dto/create-generation-task.dto'
 import { GenerationEventsService } from './generation-events.service'
 import { GenerationPublisherService } from './generation-publisher.service'
+import type { AuthenticatedUser } from '../auth/auth.types'
 
 interface CreateTaskInput {
   userId: string
@@ -13,7 +14,7 @@ interface CreateTaskInput {
 }
 
 interface UserScopedInput {
-  userId: string
+  user: AuthenticatedUser
 }
 
 interface GetTaskInput extends UserScopedInput {
@@ -100,11 +101,11 @@ export class GenerationService {
     })
   }
 
-  async retryTask({ userId, taskId }: GetTaskInput) {
+  async retryTask({ user, taskId }: GetTaskInput) {
     const existingTask = await this.prisma.generationTask.findFirst({
       where: {
         id: taskId,
-        userId
+        ...this.taskAccessWhere(user)
       },
       include: {
         attempts: {
@@ -158,18 +159,18 @@ export class GenerationService {
     })
 
     return this.publishAttempt({
-      userId,
+      userId: existingTask.userId,
       taskId: task.id,
       requestPayload,
       attempt: task.currentAttempt
     })
   }
 
-  async cancelTask({ userId, taskId }: GetTaskInput) {
+  async cancelTask({ user, taskId }: GetTaskInput) {
     const task = await this.prisma.generationTask.findFirst({
       where: {
         id: taskId,
-        userId
+        ...this.taskAccessWhere(user)
       },
       include: {
         currentAttempt: true
@@ -228,10 +229,10 @@ export class GenerationService {
     }
   }
 
-  async listTasks({ userId }: UserScopedInput) {
+  async listTasks({ user }: UserScopedInput) {
     const tasks = await this.prisma.generationTask.findMany({
       where: {
-        userId
+        userId: user.id
       },
       orderBy: {
         createdAt: 'desc'
@@ -247,11 +248,27 @@ export class GenerationService {
     }
   }
 
-  async getTask({ userId, taskId }: GetTaskInput) {
+  async listAdminTasks() {
+    const tasks = await this.prisma.generationTask.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 50,
+      include: {
+        currentAttempt: true
+      }
+    })
+
+    return {
+      items: tasks.map((task) => this.serializeTask(task))
+    }
+  }
+
+  async getTask({ user, taskId }: GetTaskInput) {
     const task = await this.prisma.generationTask.findFirst({
       where: {
         id: taskId,
-        userId
+        ...this.taskAccessWhere(user)
       },
       include: {
         currentAttempt: true,
@@ -367,6 +384,16 @@ export class GenerationService {
       createdAt: task.createdAt.toISOString(),
       updatedAt: task.updatedAt.toISOString(),
       completedAt: task.completedAt?.toISOString() ?? null
+    }
+  }
+
+  private taskAccessWhere(user: AuthenticatedUser) {
+    if (user.role === 'admin' || user.role === 'super_admin') {
+      return {}
+    }
+
+    return {
+      userId: user.id
     }
   }
 
