@@ -9,14 +9,12 @@ import type { AuthenticatedUser } from './auth.types'
 
 interface TokenPairInput {
   id: string
-  phoneCountryCode: string
   phoneNumber: string
   role: User['role']
   status: User['status']
 }
 
 interface PhonePasswordInput {
-  phoneCountryCode?: string
   phoneNumber: string
   password: string
 }
@@ -30,19 +28,16 @@ export class AuthService {
   ) {}
 
   async register({
-    phoneCountryCode,
     phoneNumber,
     password,
     displayName
   }: PhonePasswordInput & { displayName?: string }) {
-    const normalizedPhoneCountryCode = this.normalizePhoneCountryCode(phoneCountryCode)
     const normalizedPhoneNumber = this.normalizePhoneNumber(phoneNumber)
     const passwordHash = await hash(password, 12)
 
     try {
       const user = await this.prisma.user.create({
         data: {
-          phoneCountryCode: normalizedPhoneCountryCode,
           phoneNumber: normalizedPhoneNumber,
           passwordHash,
           displayName
@@ -59,13 +54,10 @@ export class AuthService {
     }
   }
 
-  async login({ phoneCountryCode, phoneNumber, password }: PhonePasswordInput) {
+  async login({ phoneNumber, password }: PhonePasswordInput) {
     const user = await this.prisma.user.findUnique({
       where: {
-        phoneCountryCode_phoneNumber: {
-          phoneCountryCode: this.normalizePhoneCountryCode(phoneCountryCode),
-          phoneNumber: this.normalizePhoneNumber(phoneNumber)
-        }
+        phoneNumber: this.normalizePhoneNumber(phoneNumber)
       }
     })
 
@@ -136,7 +128,6 @@ export class AuthService {
   async getProfile(user: AuthenticatedUser) {
     return {
       id: user.id,
-      phoneCountryCode: user.phoneCountryCode,
       phoneNumber: user.phoneNumber,
       role: user.role,
       status: user.status
@@ -147,7 +138,6 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync(
       {
         sub: user.id,
-        phoneCountryCode: user.phoneCountryCode,
         phoneNumber: user.phoneNumber,
         role: user.role,
         status: user.status
@@ -177,7 +167,6 @@ export class AuthService {
       tokenType: 'Bearer',
       user: {
         id: user.id,
-        phoneCountryCode: user.phoneCountryCode,
         phoneNumber: user.phoneNumber,
         role: user.role,
         status: user.status
@@ -187,10 +176,6 @@ export class AuthService {
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex')
-  }
-
-  private normalizePhoneCountryCode(phoneCountryCode?: string) {
-    return phoneCountryCode?.trim() || '+86'
   }
 
   private normalizePhoneNumber(phoneNumber: string) {

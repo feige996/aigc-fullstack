@@ -53,7 +53,6 @@ interface AuthResponse {
   refreshToken: string
   user: {
     id: string
-    phoneCountryCode: string
     phoneNumber: string
     role: string
     status: string
@@ -63,7 +62,6 @@ interface AuthResponse {
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.admin.auth'
-const phoneCountryCode = ref('+86')
 const phoneNumber = ref('13900139000')
 const password = ref('password123')
 const displayName = ref('Admin User')
@@ -101,7 +99,6 @@ async function authenticate(mode: 'login' | 'register') {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        phoneCountryCode: phoneCountryCode.value,
         phoneNumber: phoneNumber.value,
         password: password.value,
         displayName: displayName.value
@@ -316,7 +313,7 @@ onMounted(async () => {
             <h1>Generation Tasks</h1>
             <p>
               <template v-if="currentUser">
-                Signed in as {{ currentUser.phoneCountryCode }} {{ currentUser.phoneNumber }}
+                Signed in as {{ currentUser.phoneNumber }}
               </template>
               <template v-else>Inspect task state, attempts, and failure signals.</template>
             </p>
@@ -335,9 +332,6 @@ onMounted(async () => {
           <el-card v-if="!isAuthenticated" shadow="never" class="auth-card">
             <template #header>Sign In</template>
             <el-form label-position="top">
-              <el-form-item label="Country Code">
-                <el-input v-model="phoneCountryCode" />
-              </el-form-item>
               <el-form-item label="Phone">
                 <el-input v-model="phoneNumber" />
               </el-form-item>

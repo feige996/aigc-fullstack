@@ -1,10 +1,6 @@
 import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator'
 
 export class RegisterDto {
-  @IsOptional()
-  @IsString()
-  phoneCountryCode?: string
-
   @IsString()
   @Matches(/^1[3-9]\d{9}$/)
   phoneNumber!: string

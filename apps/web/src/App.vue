@@ -47,7 +47,6 @@ interface AuthResponse {
   refreshToken: string
   user: {
     id: string
-    phoneCountryCode: string
     phoneNumber: string
     role: string
     status: string
@@ -57,7 +56,6 @@ interface AuthResponse {
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.web.auth'
-const phoneCountryCode = ref('+86')
 const phoneNumber = ref('13800138000')
 const password = ref('password123')
 const displayName = ref('Demo User')
@@ -96,7 +94,6 @@ async function authenticate(mode: 'login' | 'register') {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        phoneCountryCode: phoneCountryCode.value,
         phoneNumber: phoneNumber.value,
         password: password.value,
         displayName: displayName.value
@@ -316,10 +313,6 @@ onBeforeUnmount(() => {
 
       <section v-if="!isAuthenticated" class="panel auth-panel">
         <label>
-          Country Code
-          <input v-model="phoneCountryCode" type="text" />
-        </label>
-        <label>
           Phone
           <input v-model="phoneNumber" type="tel" />
         </label>
@@ -340,7 +333,7 @@ onBeforeUnmount(() => {
 
       <template v-else>
       <div class="event-status">
-        User: <strong>{{ currentUser?.phoneCountryCode }} {{ currentUser?.phoneNumber }}</strong> / SSE:
+        User: <strong>{{ currentUser?.phoneNumber }}</strong> / SSE:
         <strong>{{ eventSourceStatus }}</strong>
       </div>
 

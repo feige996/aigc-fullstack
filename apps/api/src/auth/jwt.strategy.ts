@@ -7,7 +7,6 @@ import type { AuthenticatedUser } from './auth.types'
 
 interface JwtPayload {
   sub: string
-  phoneCountryCode: string
   phoneNumber: string
   role: AuthenticatedUser['role']
   status: AuthenticatedUser['status']
@@ -36,7 +35,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       },
       select: {
         id: true,
-        phoneCountryCode: true,
         phoneNumber: true,
         role: true,
         status: true
@@ -49,7 +47,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     return {
       id: user.id,
-      phoneCountryCode: user.phoneCountryCode,
       phoneNumber: user.phoneNumber,
       role: user.role,
       status: user.status

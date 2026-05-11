@@ -7,7 +7,6 @@ The current account model is phone-first and designed for China-focused usage.
 ```txt
 users
   id
-  phone_country_code
   phone_number
   password_hash
   display_name
@@ -17,7 +16,7 @@ users
   updated_at
 ```
 
-`phone_country_code + phone_number` is unique. Email is intentionally not part of the first-stage account model.
+`phone_number` is unique. Email is intentionally not part of the first-stage account model.
 
 ## Roles
 
@@ -40,7 +39,7 @@ Registration creates `role = user`. During development, promote a phone number m
 
 ```bash
 docker exec mysql-novel mysql -uaigc -paigc_password aigc \
-  -e "UPDATE users SET role='super_admin' WHERE phone_country_code='+86' AND phone_number='13900139000';"
+  -e "UPDATE users SET role='super_admin' WHERE phone_number='13900139000';"
 ```
 
 Use the promoted phone number to log in to Admin.
