@@ -28,6 +28,7 @@ model GenerationTask {
   currentAttempt GenerationTaskAttempt?     @relation("CurrentAttempt", fields: [currentAttemptId], references: [id])
   user           User                       @relation(fields: [userId], references: [id])
   project        Project?                   @relation(fields: [projectId], references: [id])
+  assets         Asset[]
 
   @@index([userId, createdAt])
   @@index([projectId, createdAt])
@@ -50,6 +51,7 @@ model User {
   generationTasks GenerationTask[]
   refreshTokens   RefreshToken[]
   projects        Project[]
+  assets          Asset[]
 
   @@unique([phoneNumber])
   @@index([role, createdAt])
@@ -68,11 +70,45 @@ model Project {
 
   user            User             @relation(fields: [userId], references: [id])
   generationTasks GenerationTask[]
+  assets          Asset[]
 
   @@unique([userId, name])
   @@index([userId, createdAt])
   @@index([status, createdAt])
   @@map("projects")
+}
+
+model Asset {
+  id          String       @id @default(cuid())
+  userId      String       @map("user_id")
+  projectId   String?      @map("project_id")
+  taskId      String?      @map("task_id")
+  type        AssetType
+  status      AssetStatus  @default(temporary)
+  provider    String
+  bucket      String
+  objectKey   String       @map("object_key")
+  mimeType    String       @map("mime_type")
+  size        Int?
+  checksum    String?
+  width       Int?
+  height      Int?
+  duration    Int?
+  expiresAt   DateTime?    @map("expires_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  user        User            @relation(fields: [userId], references: [id])
+  project     Project?        @relation(fields: [projectId], references: [id])
+  task        GenerationTask? @relation(fields: [taskId], references: [id])
+
+  @@unique([bucket, objectKey])
+  @@index([userId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([taskId, createdAt])
+  @@index([status, createdAt])
+  @@map("assets")
 }
 
 model RefreshToken {
@@ -156,6 +192,29 @@ enum UserStatus {
 enum ProjectStatus {
   active
   archived
+}
+
+enum AssetType {
+  user_upload
+  model_input
+  model_output_raw
+  processed_output
+  preview
+  cover
+  watermarked
+  source
+  audit_sample
+  temp
+}
+
+enum AssetStatus {
+  temporary
+  processing
+  active
+  blocked
+  deleted
+  expired
+  orphaned
 }
 
 enum GenerationTaskStage {

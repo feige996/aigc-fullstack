@@ -63,6 +63,21 @@ export const assetStatuses = [
 
 export type AssetStatus = (typeof assetStatuses)[number];
 
+export const assetTypes = [
+  'user_upload',
+  'model_input',
+  'model_output_raw',
+  'processed_output',
+  'preview',
+  'cover',
+  'watermarked',
+  'source',
+  'audit_sample',
+  'temp',
+] as const;
+
+export type AssetType = (typeof assetTypes)[number];
+
 export const moderationStatuses = ['pending', 'passed', 'rejected', 'manual_review'] as const;
 
 export type ModerationStatus = (typeof moderationStatuses)[number];
