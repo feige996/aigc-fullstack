@@ -147,6 +147,7 @@ apps/ai-service FastAPI Worker
 关键设计文档：
 
 - [文档写作约定](./docs/documentation-style-guide.md)
+- [通用智能项目平台演进路线](./docs/generalized-platform-roadmap.md)
 - [本地浏览器验证](./docs/local-browser-verification.md)
 - [认证账户模型](./docs/auth-account-model.md)
 - [Monorepo 总体架构](./docs/aigc-monorepo-architecture.md)
