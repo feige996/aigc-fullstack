@@ -39,6 +39,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
       const task = await tx.generationTask.findUnique({
         where: { id: message.taskId },
         select: {
+          userId: true,
           status: true,
           currentAttemptId: true
         }
@@ -70,7 +71,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
         }
       })
 
-      return true
+      return task.userId
     })
 
     if (!updated) {
@@ -80,6 +81,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
 
     this.generationEvents.publishTaskEvent('task.succeeded', {
       taskId: message.taskId,
+      userId: updated,
       status: 'succeeded',
       stage: 'completed'
     })
@@ -92,6 +94,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
       const task = await tx.generationTask.findUnique({
         where: { id: message.taskId },
         select: {
+          userId: true,
           status: true,
           currentAttemptId: true
         }
@@ -124,7 +127,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
         }
       })
 
-      return true
+      return task.userId
     })
 
     if (!updated) {
@@ -134,6 +137,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
 
     this.generationEvents.publishTaskEvent('task.failed', {
       taskId: message.taskId,
+      userId: updated,
       status: 'failed',
       stage: 'completed',
       failureCode: 'PROVIDER_FAILED'

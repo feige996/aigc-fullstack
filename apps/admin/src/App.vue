@@ -48,8 +48,24 @@ interface GenerationTask {
   completedAt: string | null
 }
 
+interface AuthResponse {
+  accessToken: string
+  refreshToken: string
+  user: {
+    id: string
+    email: string
+    role: string
+  }
+}
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
+const authStorageKey = 'aigc.admin.auth'
+const email = ref('admin@example.local')
+const password = ref('password123')
+const displayName = ref('Admin User')
+const accessToken = ref(localStorage.getItem(authStorageKey) ?? '')
+const currentUser = ref<AuthResponse['user'] | null>(null)
 const tasks = ref<GenerationTask[]>([])
 const selectedTask = ref<GenerationTask | null>(null)
 const isLoading = ref(false)
@@ -62,13 +78,83 @@ const failedTasks = computed(
   () => tasks.value.filter((task) => task.status === 'failed' || task.status === 'final_failed').length
 )
 const succeededTasks = computed(() => tasks.value.filter((task) => task.status === 'succeeded').length)
+const isAuthenticated = computed(() => Boolean(accessToken.value))
+
+function authHeaders(): Record<string, string> {
+  return accessToken.value
+    ? {
+        Authorization: `Bearer ${accessToken.value}`
+      }
+    : {}
+}
+
+async function authenticate(mode: 'login' | 'register') {
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/auth/${mode}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: email.value,
+        password: password.value,
+        displayName: displayName.value
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`${mode} failed: ${response.status}`)
+    }
+
+    const result = (await response.json()) as AuthResponse
+    accessToken.value = result.accessToken
+    currentUser.value = result.user
+    localStorage.setItem(authStorageKey, result.accessToken)
+    await loadTasks()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : `${mode} failed`
+  }
+}
+
+async function loadProfile() {
+  if (!accessToken.value) {
+    return
+  }
+
+  const response = await fetch(`${apiBaseUrl}/auth/me`, {
+    headers: authHeaders()
+  })
+
+  if (!response.ok) {
+    signOut()
+    return
+  }
+
+  currentUser.value = (await response.json()) as AuthResponse['user']
+}
+
+function signOut() {
+  accessToken.value = ''
+  currentUser.value = null
+  tasks.value = []
+  selectedTask.value = null
+  localStorage.removeItem(authStorageKey)
+}
 
 async function loadTasks() {
+  if (!accessToken.value) {
+    return
+  }
+
   isLoading.value = true
   errorMessage.value = ''
 
   try {
-    const response = await fetch(`${apiBaseUrl}/generation/tasks`)
+    const response = await fetch(`${apiBaseUrl}/generation/tasks`, {
+      headers: authHeaders()
+    })
 
     if (!response.ok) {
       throw new Error(`Load tasks failed: ${response.status}`)
@@ -88,7 +174,9 @@ async function loadTasks() {
 }
 
 async function selectTask(task: GenerationTask) {
-  const response = await fetch(`${apiBaseUrl}/generation/tasks/${task.taskId}`)
+  const response = await fetch(`${apiBaseUrl}/generation/tasks/${task.taskId}`, {
+    headers: authHeaders()
+  })
 
   if (!response.ok) {
     selectedTask.value = task
@@ -108,7 +196,8 @@ async function retrySelectedTask() {
 
   try {
     const response = await fetch(`${apiBaseUrl}/generation/tasks/${selectedTask.value.taskId}/retry`, {
-      method: 'POST'
+      method: 'POST',
+      headers: authHeaders()
     })
 
     if (!response.ok) {
@@ -139,7 +228,8 @@ async function cancelSelectedTask() {
 
   try {
     const response = await fetch(`${apiBaseUrl}/generation/tasks/${selectedTask.value.taskId}/cancel`, {
-      method: 'POST'
+      method: 'POST',
+      headers: authHeaders()
     })
 
     if (!response.ok) {
@@ -190,8 +280,9 @@ function statusType(status: TaskStatus) {
   return 'info'
 }
 
-onMounted(() => {
-  void loadTasks()
+onMounted(async () => {
+  await loadProfile()
+  await loadTasks()
 })
 </script>
 
@@ -209,14 +300,42 @@ onMounted(() => {
         <el-header class="header">
           <div>
             <h1>Generation Tasks</h1>
-            <p>Inspect task state, attempts, and failure signals.</p>
+            <p>
+              <template v-if="currentUser">Signed in as {{ currentUser.email }}</template>
+              <template v-else>Inspect task state, attempts, and failure signals.</template>
+            </p>
           </div>
-          <el-button type="primary" :loading="isLoading" @click="loadTasks">Refresh</el-button>
+          <div class="header-actions">
+            <el-button v-if="isAuthenticated" @click="signOut">Sign Out</el-button>
+            <el-button type="primary" :disabled="!isAuthenticated" :loading="isLoading" @click="loadTasks">
+              Refresh
+            </el-button>
+          </div>
         </el-header>
 
         <el-main class="main">
           <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon class="alert" />
 
+          <el-card v-if="!isAuthenticated" shadow="never" class="auth-card">
+            <template #header>Sign In</template>
+            <el-form label-position="top">
+              <el-form-item label="Email">
+                <el-input v-model="email" />
+              </el-form-item>
+              <el-form-item label="Password">
+                <el-input v-model="password" type="password" show-password />
+              </el-form-item>
+              <el-form-item label="Display Name">
+                <el-input v-model="displayName" />
+              </el-form-item>
+              <div class="auth-actions">
+                <el-button type="primary" @click="authenticate('login')">Login</el-button>
+                <el-button @click="authenticate('register')">Register</el-button>
+              </div>
+            </el-form>
+          </el-card>
+
+          <template v-else>
           <section class="metrics">
             <div>
               <span>Total</span>
@@ -306,6 +425,7 @@ onMounted(() => {
               </template>
             </el-card>
           </section>
+          </template>
         </el-main>
       </el-container>
     </el-container>
@@ -337,6 +457,11 @@ onMounted(() => {
   border-bottom: 1px solid #e5e7eb;
 }
 
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .header h1 {
   margin: 0 0 4px;
   font-size: 20px;
@@ -354,6 +479,15 @@ onMounted(() => {
 
 .alert {
   margin-bottom: -4px;
+}
+
+.auth-card {
+  max-width: 420px;
+}
+
+.auth-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .metrics {

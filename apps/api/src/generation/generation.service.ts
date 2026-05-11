@@ -212,6 +212,7 @@ export class GenerationService {
 
     this.generationEvents.publishTaskEvent('task.canceled', {
       taskId: canceledTask.id,
+      userId: canceledTask.userId,
       status: canceledTask.status,
       stage: canceledTask.stage,
       failureCode: canceledTask.failureCode
@@ -430,6 +431,7 @@ export class GenerationService {
 
       this.generationEvents.publishTaskEvent('task.queued', {
         taskId: queuedTask.id,
+        userId: queuedTask.userId,
         status: queuedTask.status,
         stage: queuedTask.stage,
         failureCode: queuedTask.failureCode
@@ -469,6 +471,7 @@ export class GenerationService {
 
       this.generationEvents.publishTaskEvent('task.failed', {
         taskId: failedTask.id,
+        userId: failedTask.userId,
         status: failedTask.status,
         stage: failedTask.stage,
         failureCode: failedTask.failureCode

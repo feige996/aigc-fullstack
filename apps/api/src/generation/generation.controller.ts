@@ -1,5 +1,8 @@
 import { Body, Controller, Get, MessageEvent as NestMessageEvent, Param, Post, Sse } from '@nestjs/common'
 import { Observable } from 'rxjs'
+import { CurrentUser } from '../auth/current-user.decorator'
+import { Public } from '../auth/public.decorator'
+import type { AuthenticatedUser } from '../auth/auth.types'
 import { CreateGenerationTaskDto } from './dto/create-generation-task.dto'
 import { GenerationEventsService } from './generation-events.service'
 import { GenerationService } from './generation.service'
@@ -12,25 +15,26 @@ export class GenerationController {
   ) {}
 
   @Post()
-  createTask(@Body() dto: CreateGenerationTaskDto) {
+  createTask(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateGenerationTaskDto) {
     return this.generationService.createTask({
-      userId: 'mock_user_001',
+      userId: user.id,
       dto
     })
   }
 
   @Get()
-  listTasks() {
+  listTasks(@CurrentUser() user: AuthenticatedUser) {
     return this.generationService.listTasks({
-      userId: 'mock_user_001'
+      userId: user.id
     })
   }
 
   @Sse('events')
-  streamEvents(): Observable<NestMessageEvent> {
-    return this.generationEventsService.stream()
+  streamEvents(@CurrentUser() user: AuthenticatedUser): Observable<NestMessageEvent> {
+    return this.generationEventsService.streamForUser(user.id)
   }
 
+  @Public()
   @Get(':taskId/attempts/:attemptId/execution-state')
   getExecutionState(@Param('taskId') taskId: string, @Param('attemptId') attemptId: string) {
     return this.generationService.getExecutionState({
@@ -40,25 +44,25 @@ export class GenerationController {
   }
 
   @Get(':taskId')
-  getTask(@Param('taskId') taskId: string) {
+  getTask(@CurrentUser() user: AuthenticatedUser, @Param('taskId') taskId: string) {
     return this.generationService.getTask({
-      userId: 'mock_user_001',
+      userId: user.id,
       taskId
     })
   }
 
   @Post(':taskId/retry')
-  retryTask(@Param('taskId') taskId: string) {
+  retryTask(@CurrentUser() user: AuthenticatedUser, @Param('taskId') taskId: string) {
     return this.generationService.retryTask({
-      userId: 'mock_user_001',
+      userId: user.id,
       taskId
     })
   }
 
   @Post(':taskId/cancel')
-  cancelTask(@Param('taskId') taskId: string) {
+  cancelTask(@CurrentUser() user: AuthenticatedUser, @Param('taskId') taskId: string) {
     return this.generationService.cancelTask({
-      userId: 'mock_user_001',
+      userId: user.id,
       taskId
     })
   }

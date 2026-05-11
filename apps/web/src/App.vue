@@ -42,8 +42,24 @@ interface GenerationTask {
   completedAt: string | null
 }
 
+interface AuthResponse {
+  accessToken: string
+  refreshToken: string
+  user: {
+    id: string
+    email: string
+    role: string
+  }
+}
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
+const authStorageKey = 'aigc.web.auth'
+const email = ref('user@example.local')
+const password = ref('password123')
+const displayName = ref('Demo User')
+const accessToken = ref(localStorage.getItem(authStorageKey) ?? '')
+const currentUser = ref<AuthResponse['user'] | null>(null)
 const prompt = ref('a clean product photo of a ceramic cup')
 const ratio = ref('1:1')
 const activeTaskId = ref('')
@@ -57,6 +73,75 @@ const eventSourceStatus = ref<'connecting' | 'open' | 'closed'>('closed')
 let eventSource: EventSource | null = null
 
 const activeTaskStatusLabel = computed(() => activeTask.value?.status ?? 'idle')
+const isAuthenticated = computed(() => Boolean(accessToken.value))
+
+function authHeaders(): Record<string, string> {
+  return accessToken.value
+    ? {
+        Authorization: `Bearer ${accessToken.value}`
+      }
+    : {}
+}
+
+async function authenticate(mode: 'login' | 'register') {
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/auth/${mode}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: email.value,
+        password: password.value,
+        displayName: displayName.value
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`${mode} failed: ${response.status}`)
+    }
+
+    const result = (await response.json()) as AuthResponse
+    accessToken.value = result.accessToken
+    currentUser.value = result.user
+    localStorage.setItem(authStorageKey, result.accessToken)
+    await loadTasks()
+    connectEvents()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : `${mode} failed`
+  }
+}
+
+async function loadProfile() {
+  if (!accessToken.value) {
+    return
+  }
+
+  const response = await fetch(`${apiBaseUrl}/auth/me`, {
+    headers: authHeaders()
+  })
+
+  if (!response.ok) {
+    signOut()
+    return
+  }
+
+  currentUser.value = (await response.json()) as AuthResponse['user']
+}
+
+function signOut() {
+  eventSource?.close()
+  eventSource = null
+  eventSourceStatus.value = 'closed'
+  accessToken.value = ''
+  currentUser.value = null
+  activeTaskId.value = ''
+  activeTask.value = null
+  tasks.value = []
+  localStorage.removeItem(authStorageKey)
+}
 
 async function createTask() {
   errorMessage.value = ''
@@ -66,7 +151,8 @@ async function createTask() {
     const response = await fetch(`${apiBaseUrl}/generation/tasks`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...authHeaders()
       },
       body: JSON.stringify({
         type: 'text_to_image',
@@ -100,7 +186,9 @@ async function refreshActiveTask() {
   isRefreshing.value = true
 
   try {
-    const response = await fetch(`${apiBaseUrl}/generation/tasks/${activeTaskId.value}`)
+    const response = await fetch(`${apiBaseUrl}/generation/tasks/${activeTaskId.value}`, {
+      headers: authHeaders()
+    })
 
     if (!response.ok) {
       throw new Error(`Fetch task failed: ${response.status}`)
@@ -124,7 +212,8 @@ async function cancelActiveTask() {
 
   try {
     const response = await fetch(`${apiBaseUrl}/generation/tasks/${activeTaskId.value}/cancel`, {
-      method: 'POST'
+      method: 'POST',
+      headers: authHeaders()
     })
 
     if (!response.ok) {
@@ -141,7 +230,13 @@ async function cancelActiveTask() {
 }
 
 async function loadTasks() {
-  const response = await fetch(`${apiBaseUrl}/generation/tasks`)
+  if (!accessToken.value) {
+    return
+  }
+
+  const response = await fetch(`${apiBaseUrl}/generation/tasks`, {
+    headers: authHeaders()
+  })
 
   if (!response.ok) {
     return
@@ -157,9 +252,15 @@ function selectTask(task: GenerationTask) {
 }
 
 function connectEvents() {
+  if (!accessToken.value) {
+    return
+  }
+
   eventSource?.close()
   eventSourceStatus.value = 'connecting'
-  eventSource = new EventSource(`${apiBaseUrl}/generation/tasks/events`)
+  eventSource = new EventSource(
+    `${apiBaseUrl}/generation/tasks/events?access_token=${encodeURIComponent(accessToken.value)}`
+  )
 
   eventSource.onopen = () => {
     eventSourceStatus.value = 'open'
@@ -182,8 +283,9 @@ function connectEvents() {
   }
 }
 
-onMounted(() => {
-  void loadTasks()
+onMounted(async () => {
+  await loadProfile()
+  await loadTasks()
   connectEvents()
 })
 
@@ -200,13 +302,37 @@ onBeforeUnmount(() => {
           <p class="eyebrow">AIGC Web</p>
           <h1>Generation Workspace</h1>
         </div>
-        <div class="status" :data-status="activeTaskStatusLabel">
-          {{ activeTaskStatusLabel }}
+        <div class="header-actions">
+          <div class="status" :data-status="activeTaskStatusLabel">
+            {{ activeTaskStatusLabel }}
+          </div>
+          <button v-if="isAuthenticated" type="button" @click="signOut">Sign Out</button>
         </div>
       </header>
 
+      <section v-if="!isAuthenticated" class="panel auth-panel">
+        <label>
+          Email
+          <input v-model="email" type="email" />
+        </label>
+        <label>
+          Password
+          <input v-model="password" type="password" />
+        </label>
+        <label>
+          Display Name
+          <input v-model="displayName" type="text" />
+        </label>
+        <div class="controls">
+          <button type="button" @click="authenticate('login')">Login</button>
+          <button type="button" @click="authenticate('register')">Register</button>
+        </div>
+        <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+      </section>
+
+      <template v-else>
       <div class="event-status">
-        SSE: <strong>{{ eventSourceStatus }}</strong>
+        User: <strong>{{ currentUser?.email }}</strong> / SSE: <strong>{{ eventSourceStatus }}</strong>
       </div>
 
       <section class="panel">
@@ -282,6 +408,7 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </section>
+      </template>
     </section>
   </main>
 </template>
@@ -308,6 +435,12 @@ onBeforeUnmount(() => {
   align-items: end;
   justify-content: space-between;
   gap: 16px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .eyebrow {
@@ -366,6 +499,7 @@ label {
 }
 
 textarea,
+input,
 select {
   width: 100%;
   box-sizing: border-box;
@@ -390,6 +524,11 @@ textarea {
 
 .controls label {
   width: 160px;
+}
+
+.auth-panel {
+  display: grid;
+  gap: 12px;
 }
 
 button {
@@ -470,6 +609,7 @@ dd {
 
 @media (max-width: 640px) {
   .header,
+  .header-actions,
   .controls,
   .result-header {
     align-items: stretch;
