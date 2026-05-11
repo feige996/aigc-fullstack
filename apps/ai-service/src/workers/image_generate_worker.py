@@ -1,7 +1,5 @@
 import json
 import logging
-import asyncio
-
 import aio_pika
 import httpx
 from pydantic import ValidationError
@@ -11,14 +9,15 @@ from ..contracts import (
     GenerationExecutionState,
     GenerationRequestMessage,
     GenerationResultMessage,
-    GenerationResultOutput,
-    GenerationResultUsage,
 )
+from ..providers import create_provider_registry
+from ..providers.base import ProviderError
 from ..rabbitmq import (
     GENERATION_RESULT_EXCHANGE,
     GENERATION_REQUEST_EXCHANGE,
     IMAGE_GENERATE_QUEUE,
     IMAGE_GENERATE_ROUTING_KEY,
+    TASK_FAILED_ROUTING_KEY,
     TASK_SUCCEEDED_ROUTING_KEY,
 )
 
@@ -28,6 +27,7 @@ logger = logging.getLogger(__name__)
 class ImageGenerateWorker:
     def __init__(self, connection: aio_pika.RobustConnection) -> None:
         self.connection = connection
+        self.provider_registry = create_provider_registry()
 
     async def run(self) -> None:
         channel = await self.connection.channel()
@@ -83,25 +83,35 @@ class ImageGenerateWorker:
                 )
                 return
 
-            await asyncio.sleep(1)
-            result = GenerationResultMessage(
-                traceId=task.trace_id,
-                taskId=task.task_id,
-                attemptId=task.attempt_id,
-                status="succeeded",
-                provider="mock-provider",
-                outputs=[
-                    GenerationResultOutput(
-                        type="image",
-                        objectPath=f"aigc/mock/{task.user_id}/{task.task_id}/output.png",
-                        previewUrl=f"https://example.invalid/preview/{task.task_id}.png",
-                        width=1024,
-                        height=1024,
-                    )
-                ],
-                usage=GenerationResultUsage(cost=1, unit="credits"),
-                error=None,
-            )
+            try:
+                provider_result = await self.provider_registry.generate(task)
+                result = GenerationResultMessage(
+                    traceId=task.trace_id,
+                    taskId=task.task_id,
+                    attemptId=task.attempt_id,
+                    status="succeeded",
+                    provider=provider_result.provider,
+                    outputs=provider_result.outputs,
+                    usage=provider_result.usage,
+                    error=None,
+                )
+                routing_key = TASK_FAILED_ROUTING_KEY
+            except ProviderError as error:
+                result = GenerationResultMessage(
+                    traceId=task.trace_id,
+                    taskId=task.task_id,
+                    attemptId=task.attempt_id,
+                    status="failed",
+                    provider="unknown",
+                    outputs=[],
+                    usage=None,
+                    error={
+                        "code": error.code,
+                        "message": error.message,
+                        "retryable": error.retryable,
+                    },
+                )
+                routing_key = TASK_SUCCEEDED_ROUTING_KEY
 
             await result_exchange.publish(
                 aio_pika.Message(
@@ -109,9 +119,9 @@ class ImageGenerateWorker:
                     content_type="application/json",
                     delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
                 ),
-                routing_key=TASK_SUCCEEDED_ROUTING_KEY,
+                routing_key=routing_key,
             )
-            logger.info("Published mock success result task_id=%s", task.task_id)
+            logger.info("Published provider result task_id=%s status=%s", task.task_id, result.status)
 
     async def fetch_execution_state(self, task: GenerationRequestMessage) -> GenerationExecutionState:
         url = f"{settings.api_base_url}/generation/tasks/{task.task_id}/attempts/{task.attempt_id}/execution-state"
