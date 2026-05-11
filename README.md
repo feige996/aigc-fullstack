@@ -150,6 +150,7 @@ apps/ai-service FastAPI Worker
 - [Platform Core 架构边界](./docs/platform-core-architecture.md)
 - [通用智能项目平台演进路线](./docs/generalized-platform-roadmap.md)
 - [Feature Manifest 设计](./docs/feature-manifest.md)
+- [Feature Registry 设计](./docs/feature-registry.md)
 - [Task 契约设计](./docs/task-contracts.md)
 - [本地浏览器验证](./docs/local-browser-verification.md)
 - [认证账户模型](./docs/auth-account-model.md)

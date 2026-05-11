@@ -17,6 +17,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@aigc/shared-contracts':
+        specifier: workspace:*
+        version: link:../../packages/shared-contracts
       '@vitejs/plugin-vue':
         specifier: ^5.2.3
         version: 5.2.4(vite@6.4.2(@types/node@22.19.18)(jiti@2.7.0)(terser@5.47.1))(vue@3.5.34(typescript@5.9.3))
@@ -130,6 +133,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@aigc/shared-contracts':
+        specifier: workspace:*
+        version: link:../../packages/shared-contracts
       '@vitejs/plugin-vue':
         specifier: ^5.2.3
         version: 5.2.4(vite@6.4.2(@types/node@22.19.18)(jiti@2.7.0)(terser@5.47.1))(vue@3.5.34(typescript@5.9.3))
