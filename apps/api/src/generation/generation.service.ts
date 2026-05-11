@@ -20,6 +20,11 @@ interface GetTaskInput extends UserScopedInput {
   taskId: string
 }
 
+interface GetExecutionStateInput {
+  taskId: string
+  attemptId: string
+}
+
 interface RequestPayload {
   clientRequestId?: string
   type: string
@@ -160,6 +165,68 @@ export class GenerationService {
     })
   }
 
+  async cancelTask({ userId, taskId }: GetTaskInput) {
+    const task = await this.prisma.generationTask.findFirst({
+      where: {
+        id: taskId,
+        userId
+      },
+      include: {
+        currentAttempt: true
+      }
+    })
+
+    if (!task) {
+      throw new NotFoundException(`Generation task ${taskId} was not found`)
+    }
+
+    if (task.status === 'succeeded' || task.status === 'canceled' || task.status === 'final_failed') {
+      throw new BadRequestException(`Task with status ${task.status} cannot be canceled`)
+    }
+
+    const canceledTask = await this.prisma.$transaction(async (tx) => {
+      if (task.currentAttempt) {
+        await tx.generationTaskAttempt.update({
+          where: { id: task.currentAttempt.id },
+          data: {
+            status: 'canceled',
+            failureCode: 'USER_CANCELED',
+            retryable: false,
+            endedAt: new Date()
+          }
+        })
+      }
+
+      return tx.generationTask.update({
+        where: { id: task.id },
+        data: {
+          status: 'canceled',
+          failureCode: 'USER_CANCELED',
+          completedAt: new Date()
+        },
+        include: {
+          currentAttempt: true
+        }
+      })
+    })
+
+    this.generationEvents.publishTaskEvent('task.canceled', {
+      taskId: canceledTask.id,
+      status: canceledTask.status,
+      stage: canceledTask.stage,
+      failureCode: canceledTask.failureCode
+    })
+
+    return {
+      taskId: canceledTask.id,
+      attemptId: canceledTask.currentAttempt?.id,
+      status: canceledTask.status,
+      stage: canceledTask.stage,
+      failureCode: canceledTask.failureCode,
+      billingStatus: canceledTask.billingStatus
+    }
+  }
+
   async listTasks({ userId }: UserScopedInput) {
     const tasks = await this.prisma.generationTask.findMany({
       where: {
@@ -200,6 +267,66 @@ export class GenerationService {
     }
 
     return this.serializeTask(task)
+  }
+
+  async getExecutionState({ taskId, attemptId }: GetExecutionStateInput) {
+    const task = await this.prisma.generationTask.findUnique({
+      where: {
+        id: taskId
+      },
+      select: {
+        status: true,
+        currentAttemptId: true,
+        currentAttempt: {
+          select: {
+            id: true,
+            status: true
+          }
+        }
+      }
+    })
+
+    if (!task) {
+      return {
+        executable: false,
+        reason: 'TASK_NOT_FOUND'
+      }
+    }
+
+    if (task.currentAttemptId !== attemptId) {
+      return {
+        executable: false,
+        reason: 'STALE_ATTEMPT',
+        taskStatus: task.status,
+        currentAttemptId: task.currentAttemptId
+      }
+    }
+
+    if (['succeeded', 'canceled', 'final_failed', 'rejected', 'expired'].includes(task.status)) {
+      return {
+        executable: false,
+        reason: 'TASK_NOT_EXECUTABLE',
+        taskStatus: task.status,
+        currentAttemptId: task.currentAttemptId
+      }
+    }
+
+    if (!task.currentAttempt || ['succeeded', 'canceled', 'failed'].includes(task.currentAttempt.status)) {
+      return {
+        executable: false,
+        reason: 'ATTEMPT_NOT_EXECUTABLE',
+        taskStatus: task.status,
+        attemptStatus: task.currentAttempt?.status,
+        currentAttemptId: task.currentAttemptId
+      }
+    }
+
+    return {
+      executable: true,
+      taskStatus: task.status,
+      attemptStatus: task.currentAttempt.status,
+      currentAttemptId: task.currentAttemptId
+    }
   }
 
   private serializeTask(task: {

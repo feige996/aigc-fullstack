@@ -20,6 +20,14 @@ class GenerationRequestMessage(BaseModel):
     attempt: int
 
 
+class GenerationExecutionState(BaseModel):
+    executable: bool
+    reason: str | None = None
+    task_status: str | None = Field(default=None, alias="taskStatus")
+    attempt_status: str | None = Field(default=None, alias="attemptStatus")
+    current_attempt_id: str | None = Field(default=None, alias="currentAttemptId")
+
+
 class GenerationResultOutput(BaseModel):
     type: str
     object_path: str = Field(alias="objectPath")

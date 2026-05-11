@@ -51,6 +51,7 @@ const activeTask = ref<GenerationTask | null>(null)
 const tasks = ref<GenerationTask[]>([])
 const isSubmitting = ref(false)
 const isRefreshing = ref(false)
+const isCanceling = ref(false)
 const errorMessage = ref('')
 const eventSourceStatus = ref<'connecting' | 'open' | 'closed'>('closed')
 let eventSource: EventSource | null = null
@@ -113,6 +114,32 @@ async function refreshActiveTask() {
   }
 }
 
+async function cancelActiveTask() {
+  if (!activeTaskId.value) {
+    return
+  }
+
+  errorMessage.value = ''
+  isCanceling.value = true
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/generation/tasks/${activeTaskId.value}/cancel`, {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      throw new Error(`Cancel task failed: ${response.status}`)
+    }
+
+    await refreshActiveTask()
+    await loadTasks()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Cancel task failed'
+  } finally {
+    isCanceling.value = false
+  }
+}
+
 async function loadTasks() {
   const response = await fetch(`${apiBaseUrl}/generation/tasks`)
 
@@ -142,7 +169,7 @@ function connectEvents() {
     eventSourceStatus.value = 'closed'
   }
 
-  for (const eventName of ['task.queued', 'task.succeeded', 'task.failed']) {
+  for (const eventName of ['task.queued', 'task.succeeded', 'task.failed', 'task.canceled']) {
     eventSource.addEventListener(eventName, (event) => {
       const payload = JSON.parse(event.data) as { taskId: string }
 
@@ -207,6 +234,9 @@ onBeforeUnmount(() => {
           <h2>Current Task</h2>
           <button type="button" :disabled="!activeTaskId || isRefreshing" @click="refreshActiveTask">
             {{ isRefreshing ? 'Refreshing...' : 'Refresh' }}
+          </button>
+          <button type="button" :disabled="!activeTaskId || isCanceling" @click="cancelActiveTask">
+            {{ isCanceling ? 'Canceling...' : 'Cancel' }}
           </button>
         </div>
 

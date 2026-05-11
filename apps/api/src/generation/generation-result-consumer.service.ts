@@ -35,7 +35,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
   }
 
   private async markSucceeded(message: GenerationResultMessage) {
-    await this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const task = await tx.generationTask.findUnique({
         where: { id: message.taskId },
         select: {
@@ -44,12 +44,12 @@ export class GenerationResultConsumerService implements OnModuleInit {
         }
       })
 
-      if (!task || task.status === 'succeeded' || task.status === 'final_failed') {
-        return
+      if (!task || task.status === 'succeeded' || task.status === 'canceled' || task.status === 'final_failed') {
+        return false
       }
 
       if (task.currentAttemptId !== message.attemptId) {
-        return
+        return false
       }
 
       await tx.generationTaskAttempt.update({
@@ -69,7 +69,14 @@ export class GenerationResultConsumerService implements OnModuleInit {
           completedAt: new Date()
         }
       })
+
+      return true
     })
+
+    if (!updated) {
+      this.logger.warn(`Skipped stale success result task_id=${message.taskId} attempt_id=${message.attemptId}`)
+      return
+    }
 
     this.generationEvents.publishTaskEvent('task.succeeded', {
       taskId: message.taskId,
@@ -81,7 +88,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
   }
 
   private async markFailed(message: GenerationResultMessage) {
-    await this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const task = await tx.generationTask.findUnique({
         where: { id: message.taskId },
         select: {
@@ -90,12 +97,12 @@ export class GenerationResultConsumerService implements OnModuleInit {
         }
       })
 
-      if (!task || task.status === 'succeeded' || task.status === 'final_failed') {
-        return
+      if (!task || task.status === 'succeeded' || task.status === 'canceled' || task.status === 'final_failed') {
+        return false
       }
 
       if (task.currentAttemptId !== message.attemptId) {
-        return
+        return false
       }
 
       await tx.generationTaskAttempt.update({
@@ -116,7 +123,14 @@ export class GenerationResultConsumerService implements OnModuleInit {
           failureCode: 'PROVIDER_FAILED'
         }
       })
+
+      return true
     })
+
+    if (!updated) {
+      this.logger.warn(`Skipped stale failed result task_id=${message.taskId} attempt_id=${message.attemptId}`)
+      return
+    }
 
     this.generationEvents.publishTaskEvent('task.failed', {
       taskId: message.taskId,

@@ -31,6 +31,14 @@ export class GenerationController {
     return this.generationEventsService.stream()
   }
 
+  @Get(':taskId/attempts/:attemptId/execution-state')
+  getExecutionState(@Param('taskId') taskId: string, @Param('attemptId') attemptId: string) {
+    return this.generationService.getExecutionState({
+      taskId,
+      attemptId
+    })
+  }
+
   @Get(':taskId')
   getTask(@Param('taskId') taskId: string) {
     return this.generationService.getTask({
@@ -42,6 +50,14 @@ export class GenerationController {
   @Post(':taskId/retry')
   retryTask(@Param('taskId') taskId: string) {
     return this.generationService.retryTask({
+      userId: 'mock_user_001',
+      taskId
+    })
+  }
+
+  @Post(':taskId/cancel')
+  cancelTask(@Param('taskId') taskId: string) {
+    return this.generationService.cancelTask({
       userId: 'mock_user_001',
       taskId
     })

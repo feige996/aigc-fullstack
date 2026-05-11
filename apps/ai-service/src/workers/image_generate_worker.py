@@ -3,9 +3,12 @@ import logging
 import asyncio
 
 import aio_pika
+import httpx
 from pydantic import ValidationError
 
+from ..config import settings
 from ..contracts import (
+    GenerationExecutionState,
     GenerationRequestMessage,
     GenerationResultMessage,
     GenerationResultOutput,
@@ -70,6 +73,16 @@ class ImageGenerateWorker:
                 task.input.prompt,
             )
 
+            execution_state = await self.fetch_execution_state(task)
+            if not execution_state.executable:
+                logger.info(
+                    "Skipped non-executable task task_id=%s attempt_id=%s reason=%s",
+                    task.task_id,
+                    task.attempt_id,
+                    execution_state.reason,
+                )
+                return
+
             await asyncio.sleep(1)
             result = GenerationResultMessage(
                 traceId=task.trace_id,
@@ -99,3 +112,19 @@ class ImageGenerateWorker:
                 routing_key=TASK_SUCCEEDED_ROUTING_KEY,
             )
             logger.info("Published mock success result task_id=%s", task.task_id)
+
+    async def fetch_execution_state(self, task: GenerationRequestMessage) -> GenerationExecutionState:
+        url = f"{settings.api_base_url}/generation/tasks/{task.task_id}/attempts/{task.attempt_id}/execution-state"
+
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                return GenerationExecutionState.model_validate(response.json())
+        except (httpx.HTTPError, ValidationError):
+            logger.exception(
+                "Failed to validate execution state task_id=%s attempt_id=%s",
+                task.task_id,
+                task.attempt_id,
+            )
+            return GenerationExecutionState(executable=False, reason="EXECUTION_STATE_UNAVAILABLE")

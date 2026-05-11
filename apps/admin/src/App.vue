@@ -54,6 +54,7 @@ const tasks = ref<GenerationTask[]>([])
 const selectedTask = ref<GenerationTask | null>(null)
 const isLoading = ref(false)
 const isRetrying = ref(false)
+const isCanceling = ref(false)
 const errorMessage = ref('')
 
 const totalTasks = computed(() => tasks.value.length)
@@ -128,8 +129,49 @@ async function retrySelectedTask() {
   }
 }
 
+async function cancelSelectedTask() {
+  if (!selectedTask.value) {
+    return
+  }
+
+  isCanceling.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/generation/tasks/${selectedTask.value.taskId}/cancel`, {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      throw new Error(`Cancel task failed: ${response.status}`)
+    }
+
+    const canceled = (await response.json()) as { taskId: string }
+    await loadTasks()
+    const task = tasks.value.find((item) => item.taskId === canceled.taskId)
+
+    if (task) {
+      await selectTask(task)
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Cancel task failed'
+  } finally {
+    isCanceling.value = false
+  }
+}
+
 function canRetry(task: GenerationTask | null) {
   return Boolean(task && task.status !== 'succeeded' && task.status !== 'running' && task.status !== 'retrying')
+}
+
+function canCancel(task: GenerationTask | null) {
+  return Boolean(
+    task &&
+      task.status !== 'succeeded' &&
+      task.status !== 'canceled' &&
+      task.status !== 'final_failed' &&
+      task.status !== 'rejected'
+  )
 }
 
 function statusType(status: TaskStatus) {
@@ -225,6 +267,15 @@ onMounted(() => {
                     @click="retrySelectedTask"
                   >
                     Retry
+                  </el-button>
+                  <el-button
+                    type="danger"
+                    size="small"
+                    :disabled="!canCancel(selectedTask)"
+                    :loading="isCanceling"
+                    @click="cancelSelectedTask"
+                  >
+                    Cancel
                   </el-button>
                 </div>
               </template>
