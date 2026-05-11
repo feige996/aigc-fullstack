@@ -2,12 +2,12 @@
 
 ## 结论
 
-当前仓库继续服务 AIGC 场景，但从后续迭代开始按“通用底座 + 业务模块”的方式演进。
+当前仓库继续服务 AIGC 场景，但从后续迭代开始按“Platform Core + Feature Modules”的方式演进。
 
 推荐方案是方案 C：
 
 ```txt
-当前仓库继续推进 AIGC 功能，同时逐步抽象通用底座，未来复用到小说智选等项目。
+当前仓库继续推进现有功能，同时逐步抽象 platform core，未来复用到小说智选、文档分析或其他智能项目。
 ```
 
 不建议现在直接把项目改成完全无业务的通用模板。过早抽象会导致代码空泛、验证困难，也会拖慢当前 AIGC 主链路。
@@ -17,7 +17,7 @@
 未来系统按两层理解：
 
 ```txt
-通用底座
+Platform Core
   Auth
   Admin
   Project
@@ -25,18 +25,19 @@
   Queue
   Task
   Provider
+  Workflow
   Observability
 
-业务模块
+Feature Modules
   AIGC 图片/视频生成
   小说智选分析
   文档解析与摘要
   其他智能工作流
 ```
 
-## 已经比较通用的模块
+## 已经比较接近 Platform Core 的模块
 
-以下模块可以直接作为通用底座继续保留：
+以下模块可以继续作为 platform core 的候选模块：
 
 - Auth 用户系统
 - Admin 用户管理和权限
@@ -46,11 +47,11 @@
 - AI Service Provider Registry
 - Web/Admin monorepo 工程结构
 
-这些模块不应该绑定到“图片生成”或“小说分析”等具体业务。
+这些模块不应该绑定到“图片生成”“小说分析”或任何具体业务。
 
-## 当前偏 AIGC 的模块
+## 当前偏 Feature 的模块
 
-以下模块仍偏 AIGC 生成场景：
+以下模块仍偏 AIGC 生成场景，未来应迁移到 feature module：
 
 - `GenerationTask`
 - `GenerationTaskAttempt`
@@ -167,21 +168,24 @@ Task
 
 推荐先走路径 1，等业务稳定后再考虑统一表。
 
-### 阶段 4：业务模块插件化
+### 阶段 4：Platform / Feature 目录边界
 
 目录逐步调整为：
 
 ```txt
 apps/api/src/platform/
   auth
+  admin
   projects
   assets
   tasks
   providers
+  workflows
 
 apps/api/src/features/
   aigc-generation
   novel-analysis
+  document-analysis
 ```
 
 前端也按类似方式拆分：
@@ -195,7 +199,8 @@ apps/web/src/features/
 
 下一步不要直接大规模改表名。建议先做：
 
-1. 新增通用 Task 设计文档。
-2. 在 shared contracts 中补 `taskDomain`、`taskType` 常量。
-3. 把 AI Service provider 文档扩展为 capability 模型。
-4. 后续再决定是否新增 `novel-analysis` 业务模块。
+1. 新增 platform core 架构边界文档。
+2. 新增通用 Task 设计文档。
+3. 在 shared contracts 中补 `taskDomain`、`taskType`、`providerCapability` 常量。
+4. 把 AI Service provider 文档扩展为 capability 模型。
+5. 后续新增业务模块时放入 `features/*`，不要继续扩展 `generation` 命名。
