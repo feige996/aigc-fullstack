@@ -243,3 +243,5 @@ export const sseEvents = {
   taskCanceled: 'task.canceled',
   quotaUpdated: 'quota.updated',
 } as const;
+
+export * from './features.js';

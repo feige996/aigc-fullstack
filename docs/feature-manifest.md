@@ -141,6 +141,13 @@ export const novelAnalysisFeature = {
 
 - 在 `shared-contracts` 中定义 `FeatureManifest` 类型。
 - 在文档中明确单业务和多业务的设计方式。
+- 在 `shared-contracts` 中提供示例 manifest，作为后续实现参考。
+
+示例位置：
+
+```txt
+packages/shared-contracts/src/features.ts
+```
 
 ## 后续落地时机
 
