@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common'
+import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt'
 import { Prisma, User } from '@prisma/client'
@@ -119,6 +119,63 @@ export class AuthService {
         revokedAt: new Date()
       }
     })
+
+    return {
+      ok: true
+    }
+  }
+
+  async changePassword(
+    userId: string,
+    {
+      currentPassword,
+      newPassword
+    }: {
+      currentPassword: string
+      newPassword: string
+    }
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: userId
+      }
+    })
+
+    if (!user) {
+      throw new NotFoundException('User not found')
+    }
+
+    if (user.status !== 'active') {
+      throw new UnauthorizedException('User is disabled')
+    }
+
+    const passwordValid = await compare(currentPassword, user.passwordHash)
+
+    if (!passwordValid) {
+      throw new UnauthorizedException('Invalid current password')
+    }
+
+    const passwordHash = await hash(newPassword, 12)
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: {
+          id: user.id
+        },
+        data: {
+          passwordHash
+        }
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: {
+          userId: user.id,
+          revokedAt: null
+        },
+        data: {
+          revokedAt: new Date()
+        }
+      })
+    ])
 
     return {
       ok: true

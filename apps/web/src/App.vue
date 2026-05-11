@@ -45,6 +45,7 @@ interface GenerationTask {
 interface AuthResponse {
   accessToken: string
   refreshToken: string
+  tokenType: string
   user: {
     id: string
     phoneNumber: string
@@ -53,13 +54,20 @@ interface AuthResponse {
   }
 }
 
+interface StoredAuth {
+  accessToken: string
+  refreshToken: string
+}
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.web.auth'
 const phoneNumber = ref('13800138000')
 const password = ref('password123')
 const displayName = ref('Demo User')
-const accessToken = ref(localStorage.getItem(authStorageKey) ?? '')
+const storedAuth = readStoredAuth()
+const accessToken = ref(storedAuth.accessToken)
+const refreshToken = ref(storedAuth.refreshToken)
 const currentUser = ref<AuthResponse['user'] | null>(null)
 const prompt = ref('a clean product photo of a ceramic cup')
 const ratio = ref('1:1')
@@ -69,12 +77,54 @@ const tasks = ref<GenerationTask[]>([])
 const isSubmitting = ref(false)
 const isRefreshing = ref(false)
 const isCanceling = ref(false)
+const isChangingPassword = ref(false)
 const errorMessage = ref('')
+const successMessage = ref('')
+const currentPassword = ref('')
+const newPassword = ref('')
 const eventSourceStatus = ref<'connecting' | 'open' | 'closed'>('closed')
 let eventSource: EventSource | null = null
 
 const activeTaskStatusLabel = computed(() => activeTask.value?.status ?? 'idle')
 const isAuthenticated = computed(() => Boolean(accessToken.value))
+
+function readStoredAuth(): StoredAuth {
+  const rawValue = localStorage.getItem(authStorageKey)
+
+  if (!rawValue) {
+    return {
+      accessToken: '',
+      refreshToken: ''
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as Partial<StoredAuth>
+
+    return {
+      accessToken: parsed.accessToken ?? '',
+      refreshToken: parsed.refreshToken ?? ''
+    }
+  } catch {
+    return {
+      accessToken: rawValue,
+      refreshToken: ''
+    }
+  }
+}
+
+function storeAuth(result: AuthResponse) {
+  accessToken.value = result.accessToken
+  refreshToken.value = result.refreshToken
+  currentUser.value = result.user
+  localStorage.setItem(
+    authStorageKey,
+    JSON.stringify({
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken
+    })
+  )
+}
 
 function authHeaders(): Record<string, string> {
   return accessToken.value
@@ -86,6 +136,7 @@ function authHeaders(): Record<string, string> {
 
 async function authenticate(mode: 'login' | 'register') {
   errorMessage.value = ''
+  successMessage.value = ''
 
   try {
     const response = await fetch(`${apiBaseUrl}/auth/${mode}`, {
@@ -105,9 +156,7 @@ async function authenticate(mode: 'login' | 'register') {
     }
 
     const result = (await response.json()) as AuthResponse
-    accessToken.value = result.accessToken
-    currentUser.value = result.user
-    localStorage.setItem(authStorageKey, result.accessToken)
+    storeAuth(result)
     await loadTasks()
     connectEvents()
   } catch (error) {
@@ -115,28 +164,89 @@ async function authenticate(mode: 'login' | 'register') {
   }
 }
 
+async function refreshAuth() {
+  if (!refreshToken.value) {
+    return false
+  }
+
+  const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      refreshToken: refreshToken.value
+    })
+  })
+
+  if (!response.ok) {
+    return false
+  }
+
+  const result = (await response.json()) as AuthResponse
+  storeAuth(result)
+  connectEvents()
+  return true
+}
+
+async function apiFetch(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    headers: {
+      ...authHeaders(),
+      ...(init.headers ?? {})
+    }
+  })
+
+  if (response.status !== 401 || !retry) {
+    return response
+  }
+
+  const refreshed = await refreshAuth()
+
+  if (!refreshed) {
+    await signOut(false)
+    return response
+  }
+
+  return apiFetch(path, init, false)
+}
+
 async function loadProfile() {
   if (!accessToken.value) {
     return
   }
 
-  const response = await fetch(`${apiBaseUrl}/auth/me`, {
-    headers: authHeaders()
-  })
+  const response = await apiFetch('/auth/me')
 
   if (!response.ok) {
-    signOut()
+    await signOut(false)
     return
   }
 
   currentUser.value = (await response.json()) as AuthResponse['user']
 }
 
-function signOut() {
+async function signOut(callServer = true) {
+  const tokenToRevoke = refreshToken.value
+
+  if (callServer && tokenToRevoke) {
+    await fetch(`${apiBaseUrl}/auth/logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        refreshToken: tokenToRevoke
+      })
+    }).catch(() => undefined)
+  }
+
   eventSource?.close()
   eventSource = null
   eventSourceStatus.value = 'closed'
   accessToken.value = ''
+  refreshToken.value = ''
   currentUser.value = null
   activeTaskId.value = ''
   activeTask.value = null
@@ -146,14 +256,14 @@ function signOut() {
 
 async function createTask() {
   errorMessage.value = ''
+  successMessage.value = ''
   isSubmitting.value = true
 
   try {
-    const response = await fetch(`${apiBaseUrl}/generation/tasks`, {
+    const response = await apiFetch('/generation/tasks', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders()
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         type: 'text_to_image',
@@ -184,12 +294,11 @@ async function refreshActiveTask() {
   }
 
   errorMessage.value = ''
+  successMessage.value = ''
   isRefreshing.value = true
 
   try {
-    const response = await fetch(`${apiBaseUrl}/generation/tasks/${activeTaskId.value}`, {
-      headers: authHeaders()
-    })
+    const response = await apiFetch(`/generation/tasks/${activeTaskId.value}`)
 
     if (!response.ok) {
       throw new Error(`Fetch task failed: ${response.status}`)
@@ -209,12 +318,12 @@ async function cancelActiveTask() {
   }
 
   errorMessage.value = ''
+  successMessage.value = ''
   isCanceling.value = true
 
   try {
-    const response = await fetch(`${apiBaseUrl}/generation/tasks/${activeTaskId.value}/cancel`, {
-      method: 'POST',
-      headers: authHeaders()
+    const response = await apiFetch(`/generation/tasks/${activeTaskId.value}/cancel`, {
+      method: 'POST'
     })
 
     if (!response.ok) {
@@ -230,14 +339,44 @@ async function cancelActiveTask() {
   }
 }
 
+async function changePassword() {
+  errorMessage.value = ''
+  successMessage.value = ''
+  isChangingPassword.value = true
+
+  try {
+    const response = await apiFetch('/auth/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        currentPassword: currentPassword.value,
+        newPassword: newPassword.value
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Change password failed: ${response.status}`)
+    }
+
+    currentPassword.value = ''
+    newPassword.value = ''
+    successMessage.value = 'Password changed. Please sign in again.'
+    await signOut(false)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Change password failed'
+  } finally {
+    isChangingPassword.value = false
+  }
+}
+
 async function loadTasks() {
   if (!accessToken.value) {
     return
   }
 
-  const response = await fetch(`${apiBaseUrl}/generation/tasks`, {
-    headers: authHeaders()
-  })
+  const response = await apiFetch('/generation/tasks')
 
   if (!response.ok) {
     return
@@ -307,7 +446,7 @@ onBeforeUnmount(() => {
           <div class="status" :data-status="activeTaskStatusLabel">
             {{ activeTaskStatusLabel }}
           </div>
-          <button v-if="isAuthenticated" type="button" @click="signOut">Sign Out</button>
+          <button v-if="isAuthenticated" type="button" @click="signOut()">Sign Out</button>
         </div>
       </header>
 
@@ -329,6 +468,7 @@ onBeforeUnmount(() => {
           <button type="button" @click="authenticate('register')">Register</button>
         </div>
         <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+        <p v-if="successMessage" class="success">{{ successMessage }}</p>
       </section>
 
       <template v-else>
@@ -336,6 +476,22 @@ onBeforeUnmount(() => {
         User: <strong>{{ currentUser?.phoneNumber }}</strong> / SSE:
         <strong>{{ eventSourceStatus }}</strong>
       </div>
+
+      <section class="panel account-panel">
+        <h2>Account</h2>
+        <label>
+          Current Password
+          <input v-model="currentPassword" type="password" />
+        </label>
+        <label>
+          New Password
+          <input v-model="newPassword" type="password" />
+        </label>
+        <button type="button" :disabled="isChangingPassword" @click="changePassword">
+          {{ isChangingPassword ? 'Changing...' : 'Change Password' }}
+        </button>
+        <p v-if="successMessage" class="success">{{ successMessage }}</p>
+      </section>
 
       <section class="panel">
         <label for="prompt">Prompt</label>
@@ -533,6 +689,18 @@ textarea {
   gap: 12px;
 }
 
+.account-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.account-panel h2,
+.account-panel p {
+  grid-column: 1 / -1;
+}
+
 button {
   min-height: 40px;
   border: 1px solid #17202a;
@@ -579,6 +747,11 @@ dd {
 .error {
   margin-top: 12px;
   color: #b42318;
+}
+
+.success {
+  margin-top: 12px;
+  color: #0f7b4f;
 }
 
 .muted {

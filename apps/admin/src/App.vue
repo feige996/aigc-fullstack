@@ -51,6 +51,7 @@ interface GenerationTask {
 interface AuthResponse {
   accessToken: string
   refreshToken: string
+  tokenType: string
   user: {
     id: string
     phoneNumber: string
@@ -59,20 +60,31 @@ interface AuthResponse {
   }
 }
 
+interface StoredAuth {
+  accessToken: string
+  refreshToken: string
+}
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.admin.auth'
 const phoneNumber = ref('13900139000')
 const password = ref('password123')
 const displayName = ref('Admin User')
-const accessToken = ref(localStorage.getItem(authStorageKey) ?? '')
+const storedAuth = readStoredAuth()
+const accessToken = ref(storedAuth.accessToken)
+const refreshToken = ref(storedAuth.refreshToken)
 const currentUser = ref<AuthResponse['user'] | null>(null)
 const tasks = ref<GenerationTask[]>([])
 const selectedTask = ref<GenerationTask | null>(null)
 const isLoading = ref(false)
 const isRetrying = ref(false)
 const isCanceling = ref(false)
+const isChangingPassword = ref(false)
 const errorMessage = ref('')
+const successMessage = ref('')
+const currentPassword = ref('')
+const newPassword = ref('')
 
 const totalTasks = computed(() => tasks.value.length)
 const failedTasks = computed(
@@ -80,6 +92,44 @@ const failedTasks = computed(
 )
 const succeededTasks = computed(() => tasks.value.filter((task) => task.status === 'succeeded').length)
 const isAuthenticated = computed(() => Boolean(accessToken.value))
+
+function readStoredAuth(): StoredAuth {
+  const rawValue = localStorage.getItem(authStorageKey)
+
+  if (!rawValue) {
+    return {
+      accessToken: '',
+      refreshToken: ''
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as Partial<StoredAuth>
+
+    return {
+      accessToken: parsed.accessToken ?? '',
+      refreshToken: parsed.refreshToken ?? ''
+    }
+  } catch {
+    return {
+      accessToken: rawValue,
+      refreshToken: ''
+    }
+  }
+}
+
+function storeAuth(result: AuthResponse) {
+  accessToken.value = result.accessToken
+  refreshToken.value = result.refreshToken
+  currentUser.value = result.user
+  localStorage.setItem(
+    authStorageKey,
+    JSON.stringify({
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken
+    })
+  )
+}
 
 function authHeaders(): Record<string, string> {
   return accessToken.value
@@ -91,6 +141,7 @@ function authHeaders(): Record<string, string> {
 
 async function authenticate(mode: 'login' | 'register') {
   errorMessage.value = ''
+  successMessage.value = ''
 
   try {
     const response = await fetch(`${apiBaseUrl}/auth/${mode}`, {
@@ -115,13 +166,63 @@ async function authenticate(mode: 'login' | 'register') {
       throw new Error('No admin access')
     }
 
-    accessToken.value = result.accessToken
-    currentUser.value = result.user
-    localStorage.setItem(authStorageKey, result.accessToken)
+    storeAuth(result)
     await loadTasks()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : `${mode} failed`
   }
+}
+
+async function refreshAuth() {
+  if (!refreshToken.value) {
+    return false
+  }
+
+  const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      refreshToken: refreshToken.value
+    })
+  })
+
+  if (!response.ok) {
+    return false
+  }
+
+  const result = (await response.json()) as AuthResponse
+
+  if (!['admin', 'super_admin'].includes(result.user.role)) {
+    return false
+  }
+
+  storeAuth(result)
+  return true
+}
+
+async function apiFetch(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    headers: {
+      ...authHeaders(),
+      ...(init.headers ?? {})
+    }
+  })
+
+  if (response.status !== 401 || !retry) {
+    return response
+  }
+
+  const refreshed = await refreshAuth()
+
+  if (!refreshed) {
+    await signOut(false)
+    return response
+  }
+
+  return apiFetch(path, init, false)
 }
 
 async function loadProfile() {
@@ -129,25 +230,38 @@ async function loadProfile() {
     return
   }
 
-  const response = await fetch(`${apiBaseUrl}/auth/me`, {
-    headers: authHeaders()
-  })
+  const response = await apiFetch('/auth/me')
 
   if (!response.ok) {
-    signOut()
+    await signOut(false)
     return
   }
 
   currentUser.value = (await response.json()) as AuthResponse['user']
 
   if (!['admin', 'super_admin'].includes(currentUser.value.role)) {
-    signOut()
+    await signOut(false)
     errorMessage.value = 'No admin access'
   }
 }
 
-function signOut() {
+async function signOut(callServer = true) {
+  const tokenToRevoke = refreshToken.value
+
+  if (callServer && tokenToRevoke) {
+    await fetch(`${apiBaseUrl}/auth/logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        refreshToken: tokenToRevoke
+      })
+    }).catch(() => undefined)
+  }
+
   accessToken.value = ''
+  refreshToken.value = ''
   currentUser.value = null
   tasks.value = []
   selectedTask.value = null
@@ -161,11 +275,10 @@ async function loadTasks() {
 
   isLoading.value = true
   errorMessage.value = ''
+  successMessage.value = ''
 
   try {
-    const response = await fetch(`${apiBaseUrl}/generation/tasks/admin`, {
-      headers: authHeaders()
-    })
+    const response = await apiFetch('/generation/tasks/admin')
 
     if (!response.ok) {
       throw new Error(`Load tasks failed: ${response.status}`)
@@ -185,9 +298,7 @@ async function loadTasks() {
 }
 
 async function selectTask(task: GenerationTask) {
-  const response = await fetch(`${apiBaseUrl}/generation/tasks/${task.taskId}`, {
-    headers: authHeaders()
-  })
+  const response = await apiFetch(`/generation/tasks/${task.taskId}`)
 
   if (!response.ok) {
     selectedTask.value = task
@@ -204,11 +315,11 @@ async function retrySelectedTask() {
 
   isRetrying.value = true
   errorMessage.value = ''
+  successMessage.value = ''
 
   try {
-    const response = await fetch(`${apiBaseUrl}/generation/tasks/${selectedTask.value.taskId}/retry`, {
-      method: 'POST',
-      headers: authHeaders()
+    const response = await apiFetch(`/generation/tasks/${selectedTask.value.taskId}/retry`, {
+      method: 'POST'
     })
 
     if (!response.ok) {
@@ -236,11 +347,11 @@ async function cancelSelectedTask() {
 
   isCanceling.value = true
   errorMessage.value = ''
+  successMessage.value = ''
 
   try {
-    const response = await fetch(`${apiBaseUrl}/generation/tasks/${selectedTask.value.taskId}/cancel`, {
-      method: 'POST',
-      headers: authHeaders()
+    const response = await apiFetch(`/generation/tasks/${selectedTask.value.taskId}/cancel`, {
+      method: 'POST'
     })
 
     if (!response.ok) {
@@ -258,6 +369,38 @@ async function cancelSelectedTask() {
     errorMessage.value = error instanceof Error ? error.message : 'Cancel task failed'
   } finally {
     isCanceling.value = false
+  }
+}
+
+async function changePassword() {
+  isChangingPassword.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const response = await apiFetch('/auth/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        currentPassword: currentPassword.value,
+        newPassword: newPassword.value
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Change password failed: ${response.status}`)
+    }
+
+    currentPassword.value = ''
+    newPassword.value = ''
+    successMessage.value = 'Password changed. Please sign in again.'
+    await signOut(false)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Change password failed'
+  } finally {
+    isChangingPassword.value = false
   }
 }
 
@@ -319,7 +462,7 @@ onMounted(async () => {
             </p>
           </div>
           <div class="header-actions">
-            <el-button v-if="isAuthenticated" @click="signOut">Sign Out</el-button>
+            <el-button v-if="isAuthenticated" @click="signOut()">Sign Out</el-button>
             <el-button type="primary" :disabled="!isAuthenticated" :loading="isLoading" @click="loadTasks">
               Refresh
             </el-button>
@@ -328,6 +471,7 @@ onMounted(async () => {
 
         <el-main class="main">
           <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon class="alert" />
+          <el-alert v-if="successMessage" :title="successMessage" type="success" show-icon class="alert" />
 
           <el-card v-if="!isAuthenticated" shadow="never" class="auth-card">
             <template #header>Sign In</template>
@@ -349,6 +493,23 @@ onMounted(async () => {
           </el-card>
 
           <template v-else>
+          <el-card shadow="never" class="account-card">
+            <template #header>Account</template>
+            <el-form label-position="top" class="account-form">
+              <el-form-item label="Current Password">
+                <el-input v-model="currentPassword" type="password" show-password />
+              </el-form-item>
+              <el-form-item label="New Password">
+                <el-input v-model="newPassword" type="password" show-password />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="isChangingPassword" @click="changePassword">
+                  Change Password
+                </el-button>
+              </el-form-item>
+            </el-form>
+          </el-card>
+
           <section class="metrics">
             <div>
               <span>Total</span>
@@ -501,6 +662,21 @@ onMounted(async () => {
 .auth-actions {
   display: flex;
   gap: 8px;
+}
+
+.account-card {
+  border-radius: 8px;
+}
+
+.account-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 240px)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.account-form :deep(.el-form-item) {
+  margin-bottom: 0;
 }
 
 .metrics {
