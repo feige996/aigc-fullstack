@@ -142,6 +142,7 @@ Model providers / ComfyUI / internal models
 
 Key design documents:
 
+- [Local Browser Verification](./docs/local-browser-verification.md)
 - [Monorepo Architecture](./docs/aigc-monorepo-architecture.md)
 - [Backend Architecture](./docs/aigc-backend-fastapi-nestjs-architecture.md)
 - [Queue Design](./docs/aigc-queue-rabbitmq-vs-bullmq.md)
