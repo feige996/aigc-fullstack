@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import type { GenerationRequestMessage } from '@aigc/shared-contracts'
 import { createHash, randomUUID } from 'node:crypto'
 import { PrismaService } from '../prisma/prisma.service'
@@ -8,6 +8,14 @@ import { GenerationPublisherService } from './generation-publisher.service'
 interface CreateTaskInput {
   userId: string
   dto: CreateGenerationTaskDto
+}
+
+interface UserScopedInput {
+  userId: string
+}
+
+interface GetTaskInput extends UserScopedInput {
+  taskId: string
 }
 
 @Injectable()
@@ -155,6 +163,88 @@ export class GenerationService {
         failureCode: failedTask.failureCode,
         billingStatus: failedTask.billingStatus
       }
+    }
+  }
+
+  async listTasks({ userId }: UserScopedInput) {
+    const tasks = await this.prisma.generationTask.findMany({
+      where: {
+        userId
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 20,
+      include: {
+        currentAttempt: true
+      }
+    })
+
+    return {
+      items: tasks.map((task) => this.serializeTask(task))
+    }
+  }
+
+  async getTask({ userId, taskId }: GetTaskInput) {
+    const task = await this.prisma.generationTask.findFirst({
+      where: {
+        id: taskId,
+        userId
+      },
+      include: {
+        currentAttempt: true,
+        attempts: {
+          orderBy: {
+            attemptNo: 'asc'
+          }
+        }
+      }
+    })
+
+    if (!task) {
+      throw new NotFoundException(`Generation task ${taskId} was not found`)
+    }
+
+    return this.serializeTask(task)
+  }
+
+  private serializeTask(task: {
+    id: string
+    userId: string
+    projectId: string | null
+    type: string
+    model: string
+    status: string
+    stage: string
+    failureCode: string | null
+    billingStatus: string
+    currentAttemptId: string | null
+    maxAttempts: number
+    requestPayload: unknown
+    createdAt: Date
+    updatedAt: Date
+    completedAt: Date | null
+    currentAttempt?: unknown
+    attempts?: unknown[]
+  }) {
+    return {
+      taskId: task.id,
+      userId: task.userId,
+      projectId: task.projectId,
+      type: task.type,
+      model: task.model,
+      status: task.status,
+      stage: task.stage,
+      failureCode: task.failureCode,
+      billingStatus: task.billingStatus,
+      currentAttemptId: task.currentAttemptId,
+      maxAttempts: task.maxAttempts,
+      requestPayload: task.requestPayload,
+      currentAttempt: task.currentAttempt,
+      attempts: task.attempts,
+      createdAt: task.createdAt.toISOString(),
+      updatedAt: task.updatedAt.toISOString(),
+      completedAt: task.completedAt?.toISOString() ?? null
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post } from '@nestjs/common'
 import { CreateGenerationTaskDto } from './dto/create-generation-task.dto'
 import { GenerationService } from './generation.service'
 
@@ -11,6 +11,21 @@ export class GenerationController {
     return this.generationService.createTask({
       userId: 'mock_user_001',
       dto
+    })
+  }
+
+  @Get()
+  listTasks() {
+    return this.generationService.listTasks({
+      userId: 'mock_user_001'
+    })
+  }
+
+  @Get(':taskId')
+  getTask(@Param('taskId') taskId: string) {
+    return this.generationService.getTask({
+      userId: 'mock_user_001',
+      taskId
     })
   }
 }
