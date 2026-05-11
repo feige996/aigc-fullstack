@@ -17,7 +17,7 @@ type TaskStatus =
 
 type UserRole = 'user' | 'admin' | 'super_admin'
 type UserStatus = 'active' | 'disabled'
-type ActiveView = 'tasks' | 'users'
+type ActiveView = 'tasks' | 'users' | 'projects'
 
 interface GenerationAttempt {
   id: string
@@ -79,6 +79,22 @@ interface AdminUser {
   updatedAt: string
 }
 
+interface Project {
+  projectId: string
+  userId: string
+  name: string
+  description: string | null
+  status: string
+  taskCount?: number
+  user?: {
+    id: string
+    phoneNumber: string
+    displayName: string | null
+  }
+  createdAt: string
+  updatedAt: string
+}
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.admin.auth'
@@ -93,8 +109,10 @@ const activeView = ref<ActiveView>('tasks')
 const tasks = ref<GenerationTask[]>([])
 const selectedTask = ref<GenerationTask | null>(null)
 const users = ref<AdminUser[]>([])
+const projects = ref<Project[]>([])
 const isLoading = ref(false)
 const isLoadingUsers = ref(false)
+const isLoadingProjects = ref(false)
 const isRetrying = ref(false)
 const isCanceling = ref(false)
 const isChangingPassword = ref(false)
@@ -111,7 +129,17 @@ const failedTasks = computed(
 const succeededTasks = computed(() => tasks.value.filter((task) => task.status === 'succeeded').length)
 const isAuthenticated = computed(() => Boolean(accessToken.value))
 const isSuperAdmin = computed(() => currentUser.value?.role === 'super_admin')
-const pageTitle = computed(() => (activeView.value === 'users' ? 'Users' : 'Generation Tasks'))
+const pageTitle = computed(() => {
+  if (activeView.value === 'users') {
+    return 'Users'
+  }
+
+  if (activeView.value === 'projects') {
+    return 'Projects'
+  }
+
+  return 'Generation Tasks'
+})
 const pageDescription = computed(() => {
   if (!currentUser.value) {
     return 'Inspect task state, attempts, and failure signals.'
@@ -294,12 +322,18 @@ async function signOut(callServer = true) {
   tasks.value = []
   selectedTask.value = null
   users.value = []
+  projects.value = []
   localStorage.removeItem(authStorageKey)
 }
 
 async function loadCurrentView() {
   if (activeView.value === 'users') {
     await loadUsers()
+    return
+  }
+
+  if (activeView.value === 'projects') {
+    await loadProjects()
     return
   }
 
@@ -369,6 +403,31 @@ async function loadUsers() {
     errorMessage.value = error instanceof Error ? error.message : 'Load users failed'
   } finally {
     isLoadingUsers.value = false
+  }
+}
+
+async function loadProjects() {
+  if (!accessToken.value) {
+    return
+  }
+
+  isLoadingProjects.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const response = await apiFetch('/projects')
+
+    if (!response.ok) {
+      throw new Error(`Load projects failed: ${response.status}`)
+    }
+
+    const result = (await response.json()) as { items: Project[] }
+    projects.value = result.items
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Load projects failed'
+  } finally {
+    isLoadingProjects.value = false
   }
 }
 
@@ -559,6 +618,18 @@ function statusType(status: TaskStatus) {
   return 'info'
 }
 
+function refreshLoading() {
+  if (activeView.value === 'users') {
+    return isLoadingUsers.value
+  }
+
+  if (activeView.value === 'projects') {
+    return isLoadingProjects.value
+  }
+
+  return isLoading.value
+}
+
 onMounted(async () => {
   await loadProfile()
   await loadCurrentView()
@@ -578,6 +649,7 @@ onMounted(async () => {
           @select="(index: string) => setActiveView(index as ActiveView)"
         >
           <el-menu-item index="tasks">Tasks</el-menu-item>
+          <el-menu-item index="projects">Projects</el-menu-item>
           <el-menu-item index="users">Users</el-menu-item>
         </el-menu>
       </el-aside>
@@ -593,7 +665,7 @@ onMounted(async () => {
             <el-button
               type="primary"
               :disabled="!isAuthenticated"
-              :loading="activeView === 'users' ? isLoadingUsers : isLoading"
+              :loading="refreshLoading()"
               @click="loadCurrentView"
             >
               Refresh
@@ -734,7 +806,7 @@ onMounted(async () => {
           </section>
           </template>
 
-          <template v-else>
+          <template v-else-if="activeView === 'users'">
           <el-card shadow="never" class="users-card">
             <template #header>User Management</template>
             <el-table v-loading="isLoadingUsers" :data="users" height="560">
@@ -785,6 +857,30 @@ onMounted(async () => {
                   </el-button>
                 </template>
               </el-table-column>
+            </el-table>
+          </el-card>
+          </template>
+
+          <template v-else-if="activeView === 'projects'">
+          <el-card shadow="never" class="projects-card">
+            <template #header>Project Management</template>
+            <el-table v-loading="isLoadingProjects" :data="projects" height="560">
+              <el-table-column prop="name" label="Name" min-width="180" show-overflow-tooltip />
+              <el-table-column prop="description" label="Description" min-width="220" show-overflow-tooltip />
+              <el-table-column label="Owner" width="160">
+                <template #default="{ row }">
+                  {{ row.user?.phoneNumber ?? row.userId }}
+                </template>
+              </el-table-column>
+              <el-table-column label="Status" width="120">
+                <template #default="{ row }">
+                  <el-tag :type="row.status === 'active' ? 'success' : 'info'" effect="plain">
+                    {{ row.status }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="taskCount" label="Tasks" width="90" />
+              <el-table-column prop="createdAt" label="Created" width="220" />
             </el-table>
           </el-card>
           </template>

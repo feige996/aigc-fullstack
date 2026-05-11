@@ -28,6 +28,7 @@ interface GetExecutionStateInput {
 
 interface RequestPayload {
   clientRequestId?: string
+  projectId?: string
   type: string
   model: string
   prompt: string
@@ -45,8 +46,13 @@ export class GenerationService {
   ) {}
 
   async createTask({ userId, dto }: CreateTaskInput) {
+    const projectId = await this.resolveProjectId({
+      userId,
+      projectId: dto.projectId
+    })
     const requestPayload: RequestPayload = {
       clientRequestId: dto.clientRequestId,
+      projectId: projectId ?? undefined,
       type: dto.type,
       model: dto.model,
       prompt: dto.prompt,
@@ -61,6 +67,7 @@ export class GenerationService {
       const createdTask = await tx.generationTask.create({
         data: {
           userId,
+          projectId,
           type: dto.type,
           model: dto.model,
           status: 'pending',
@@ -395,6 +402,29 @@ export class GenerationService {
     return {
       userId: user.id
     }
+  }
+
+  private async resolveProjectId({ userId, projectId }: { userId: string; projectId?: string }) {
+    if (!projectId) {
+      return null
+    }
+
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: projectId,
+        userId,
+        status: 'active'
+      },
+      select: {
+        id: true
+      }
+    })
+
+    if (!project) {
+      throw new BadRequestException('Project is invalid or archived')
+    }
+
+    return project.id
   }
 
   private async publishAttempt({

@@ -27,6 +27,7 @@ interface CreateTaskResponse {
 
 interface GenerationTask {
   taskId: string
+  projectId: string | null
   type: string
   model: string
   status: TaskStatus
@@ -59,6 +60,17 @@ interface StoredAuth {
   refreshToken: string
 }
 
+interface Project {
+  projectId: string
+  userId: string
+  name: string
+  description: string | null
+  status: string
+  taskCount?: number
+  createdAt: string
+  updatedAt: string
+}
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.web.auth'
@@ -69,12 +81,17 @@ const storedAuth = readStoredAuth()
 const accessToken = ref(storedAuth.accessToken)
 const refreshToken = ref(storedAuth.refreshToken)
 const currentUser = ref<AuthResponse['user'] | null>(null)
+const projects = ref<Project[]>([])
+const selectedProjectId = ref('')
+const projectName = ref('Default Project')
+const projectDescription = ref('')
 const prompt = ref('a clean product photo of a ceramic cup')
 const ratio = ref('1:1')
 const activeTaskId = ref('')
 const activeTask = ref<GenerationTask | null>(null)
 const tasks = ref<GenerationTask[]>([])
 const isSubmitting = ref(false)
+const isCreatingProject = ref(false)
 const isRefreshing = ref(false)
 const isCanceling = ref(false)
 const isChangingPassword = ref(false)
@@ -157,6 +174,7 @@ async function authenticate(mode: 'login' | 'register') {
 
     const result = (await response.json()) as AuthResponse
     storeAuth(result)
+    await loadProjects()
     await loadTasks()
     connectEvents()
   } catch (error) {
@@ -251,7 +269,62 @@ async function signOut(callServer = true) {
   activeTaskId.value = ''
   activeTask.value = null
   tasks.value = []
+  projects.value = []
+  selectedProjectId.value = ''
   localStorage.removeItem(authStorageKey)
+}
+
+async function loadProjects() {
+  if (!accessToken.value) {
+    return
+  }
+
+  const response = await apiFetch('/projects')
+
+  if (!response.ok) {
+    return
+  }
+
+  const result = (await response.json()) as { items: Project[] }
+  projects.value = result.items
+
+  if (!selectedProjectId.value && result.items[0]) {
+    selectedProjectId.value = result.items[0].projectId
+  }
+}
+
+async function createProject() {
+  errorMessage.value = ''
+  successMessage.value = ''
+  isCreatingProject.value = true
+
+  try {
+    const response = await apiFetch('/projects', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: projectName.value,
+        description: projectDescription.value
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Create project failed: ${response.status}`)
+    }
+
+    const project = (await response.json()) as Project
+    projects.value = [project, ...projects.value]
+    selectedProjectId.value = project.projectId
+    projectName.value = ''
+    projectDescription.value = ''
+    successMessage.value = 'Project created.'
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Create project failed'
+  } finally {
+    isCreatingProject.value = false
+  }
 }
 
 async function createTask() {
@@ -266,6 +339,7 @@ async function createTask() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
+        projectId: selectedProjectId.value || undefined,
         type: 'text_to_image',
         model: 'mock-image-v1',
         prompt: prompt.value,
@@ -425,6 +499,7 @@ function connectEvents() {
 
 onMounted(async () => {
   await loadProfile()
+  await loadProjects()
   await loadTasks()
   connectEvents()
 })
@@ -493,6 +568,30 @@ onBeforeUnmount(() => {
         <p v-if="successMessage" class="success">{{ successMessage }}</p>
       </section>
 
+      <section class="panel project-panel">
+        <h2>Project</h2>
+        <label>
+          Active Project
+          <select v-model="selectedProjectId">
+            <option value="">No Project</option>
+            <option v-for="project in projects" :key="project.projectId" :value="project.projectId">
+              {{ project.name }}
+            </option>
+          </select>
+        </label>
+        <label>
+          New Project
+          <input v-model="projectName" type="text" />
+        </label>
+        <label>
+          Description
+          <input v-model="projectDescription" type="text" />
+        </label>
+        <button type="button" :disabled="isCreatingProject" @click="createProject">
+          {{ isCreatingProject ? 'Creating...' : 'Create Project' }}
+        </button>
+      </section>
+
       <section class="panel">
         <label for="prompt">Prompt</label>
         <textarea id="prompt" v-model="prompt" rows="5" />
@@ -532,6 +631,10 @@ onBeforeUnmount(() => {
             <dd>{{ activeTask.taskId }}</dd>
           </div>
           <div>
+            <dt>Project ID</dt>
+            <dd>{{ activeTask.projectId ?? 'none' }}</dd>
+          </div>
+          <div>
             <dt>Status</dt>
             <dd>{{ activeTask.status }}</dd>
           </div>
@@ -562,7 +665,7 @@ onBeforeUnmount(() => {
             @click="selectTask(task)"
           >
             <span>{{ task.requestPayload.prompt }}</span>
-            <strong>{{ task.status }}</strong>
+            <strong>{{ task.status }} / {{ task.projectId ?? 'none' }}</strong>
           </button>
         </div>
       </section>
@@ -694,6 +797,17 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
   align-items: end;
   gap: 12px;
+}
+
+.project-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.project-panel h2 {
+  grid-column: 1 / -1;
 }
 
 .account-panel h2,

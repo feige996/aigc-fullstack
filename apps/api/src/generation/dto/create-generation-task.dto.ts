@@ -5,6 +5,10 @@ export class CreateGenerationTaskDto {
   @IsString()
   clientRequestId?: string
 
+  @IsOptional()
+  @IsString()
+  projectId?: string
+
   @IsString()
   type!: string
 
