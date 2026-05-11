@@ -1,11 +1,15 @@
-import { IsEmail, IsString, MinLength } from 'class-validator'
+import { IsOptional, IsString, Matches, MinLength } from 'class-validator'
 
 export class LoginDto {
-  @IsEmail()
-  email!: string
+  @IsOptional()
+  @IsString()
+  phoneCountryCode?: string
+
+  @IsString()
+  @Matches(/^1[3-9]\d{9}$/)
+  phoneNumber!: string
 
   @IsString()
   @MinLength(8)
   password!: string
 }
-

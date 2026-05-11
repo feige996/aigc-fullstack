@@ -6,7 +6,9 @@ import type { AuthenticatedUser } from './auth.types'
 
 interface JwtPayload {
   sub: string
-  email: string
+  phoneCountryCode: string
+  phoneNumber: string
+  email?: string | null
   role: AuthenticatedUser['role']
 }
 
@@ -26,9 +28,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   validate(payload: JwtPayload): AuthenticatedUser {
     return {
       id: payload.sub,
-      email: payload.email,
+      phoneCountryCode: payload.phoneCountryCode,
+      phoneNumber: payload.phoneNumber,
+      email: payload.email ?? null,
       role: payload.role
     }
   }
 }
-

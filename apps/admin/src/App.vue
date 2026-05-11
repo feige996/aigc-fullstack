@@ -53,7 +53,9 @@ interface AuthResponse {
   refreshToken: string
   user: {
     id: string
-    email: string
+    phoneCountryCode: string
+    phoneNumber: string
+    email: string | null
     role: string
   }
 }
@@ -61,7 +63,9 @@ interface AuthResponse {
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.admin.auth'
-const email = ref('admin@example.local')
+const phoneCountryCode = ref('+86')
+const phoneNumber = ref('13900139000')
+const email = ref('')
 const password = ref('password123')
 const displayName = ref('Admin User')
 const accessToken = ref(localStorage.getItem(authStorageKey) ?? '')
@@ -98,6 +102,8 @@ async function authenticate(mode: 'login' | 'register') {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
+        phoneCountryCode: phoneCountryCode.value,
+        phoneNumber: phoneNumber.value,
         email: email.value,
         password: password.value,
         displayName: displayName.value
@@ -301,7 +307,9 @@ onMounted(async () => {
           <div>
             <h1>Generation Tasks</h1>
             <p>
-              <template v-if="currentUser">Signed in as {{ currentUser.email }}</template>
+              <template v-if="currentUser">
+                Signed in as {{ currentUser.phoneCountryCode }} {{ currentUser.phoneNumber }}
+              </template>
               <template v-else>Inspect task state, attempts, and failure signals.</template>
             </p>
           </div>
@@ -319,6 +327,12 @@ onMounted(async () => {
           <el-card v-if="!isAuthenticated" shadow="never" class="auth-card">
             <template #header>Sign In</template>
             <el-form label-position="top">
+              <el-form-item label="Country Code">
+                <el-input v-model="phoneCountryCode" />
+              </el-form-item>
+              <el-form-item label="Phone">
+                <el-input v-model="phoneNumber" />
+              </el-form-item>
               <el-form-item label="Email">
                 <el-input v-model="email" />
               </el-form-item>

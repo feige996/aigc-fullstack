@@ -47,7 +47,9 @@ interface AuthResponse {
   refreshToken: string
   user: {
     id: string
-    email: string
+    phoneCountryCode: string
+    phoneNumber: string
+    email: string | null
     role: string
   }
 }
@@ -55,7 +57,9 @@ interface AuthResponse {
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.web.auth'
-const email = ref('user@example.local')
+const phoneCountryCode = ref('+86')
+const phoneNumber = ref('13800138000')
+const email = ref('')
 const password = ref('password123')
 const displayName = ref('Demo User')
 const accessToken = ref(localStorage.getItem(authStorageKey) ?? '')
@@ -93,6 +97,8 @@ async function authenticate(mode: 'login' | 'register') {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
+        phoneCountryCode: phoneCountryCode.value,
+        phoneNumber: phoneNumber.value,
         email: email.value,
         password: password.value,
         displayName: displayName.value
@@ -312,12 +318,20 @@ onBeforeUnmount(() => {
 
       <section v-if="!isAuthenticated" class="panel auth-panel">
         <label>
-          Email
-          <input v-model="email" type="email" />
+          Country Code
+          <input v-model="phoneCountryCode" type="text" />
+        </label>
+        <label>
+          Phone
+          <input v-model="phoneNumber" type="tel" />
         </label>
         <label>
           Password
           <input v-model="password" type="password" />
+        </label>
+        <label>
+          Email
+          <input v-model="email" type="email" />
         </label>
         <label>
           Display Name
@@ -332,7 +346,8 @@ onBeforeUnmount(() => {
 
       <template v-else>
       <div class="event-status">
-        User: <strong>{{ currentUser?.email }}</strong> / SSE: <strong>{{ eventSourceStatus }}</strong>
+        User: <strong>{{ currentUser?.phoneCountryCode }} {{ currentUser?.phoneNumber }}</strong> / SSE:
+        <strong>{{ eventSourceStatus }}</strong>
       </div>
 
       <section class="panel">

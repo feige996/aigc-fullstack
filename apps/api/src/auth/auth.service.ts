@@ -9,8 +9,16 @@ import type { AuthenticatedUser } from './auth.types'
 
 interface TokenPairInput {
   id: string
-  email: string
+  phoneCountryCode: string
+  phoneNumber: string
+  email: string | null
   role: User['role']
+}
+
+interface PhonePasswordInput {
+  phoneCountryCode?: string
+  phoneNumber: string
+  password: string
 }
 
 @Injectable()
@@ -21,13 +29,23 @@ export class AuthService {
     private readonly configService: ConfigService
   ) {}
 
-  async register({ email, password, displayName }: { email: string; password: string; displayName?: string }) {
-    const normalizedEmail = email.trim().toLowerCase()
+  async register({
+    phoneCountryCode,
+    phoneNumber,
+    email,
+    password,
+    displayName
+  }: PhonePasswordInput & { email?: string; displayName?: string }) {
+    const normalizedPhoneCountryCode = this.normalizePhoneCountryCode(phoneCountryCode)
+    const normalizedPhoneNumber = this.normalizePhoneNumber(phoneNumber)
+    const normalizedEmail = email ? email.trim().toLowerCase() : undefined
     const passwordHash = await hash(password, 12)
 
     try {
       const user = await this.prisma.user.create({
         data: {
+          phoneCountryCode: normalizedPhoneCountryCode,
+          phoneNumber: normalizedPhoneNumber,
           email: normalizedEmail,
           passwordHash,
           displayName
@@ -37,29 +55,31 @@ export class AuthService {
       return this.createAuthResponse(user)
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Email already exists')
+        throw new ConflictException('Phone number or email already exists')
       }
 
       throw error
     }
   }
 
-  async login({ email, password }: { email: string; password: string }) {
-    const normalizedEmail = email.trim().toLowerCase()
+  async login({ phoneCountryCode, phoneNumber, password }: PhonePasswordInput) {
     const user = await this.prisma.user.findUnique({
       where: {
-        email: normalizedEmail
+        phoneCountryCode_phoneNumber: {
+          phoneCountryCode: this.normalizePhoneCountryCode(phoneCountryCode),
+          phoneNumber: this.normalizePhoneNumber(phoneNumber)
+        }
       }
     })
 
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password')
+      throw new UnauthorizedException('Invalid phone number or password')
     }
 
     const passwordValid = await compare(password, user.passwordHash)
 
     if (!passwordValid) {
-      throw new UnauthorizedException('Invalid email or password')
+      throw new UnauthorizedException('Invalid phone number or password')
     }
 
     return this.createAuthResponse(user)
@@ -111,6 +131,8 @@ export class AuthService {
   async getProfile(user: AuthenticatedUser) {
     return {
       id: user.id,
+      phoneCountryCode: user.phoneCountryCode,
+      phoneNumber: user.phoneNumber,
       email: user.email,
       role: user.role
     }
@@ -120,6 +142,8 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync(
       {
         sub: user.id,
+        phoneCountryCode: user.phoneCountryCode,
+        phoneNumber: user.phoneNumber,
         email: user.email,
         role: user.role
       },
@@ -148,6 +172,8 @@ export class AuthService {
       tokenType: 'Bearer',
       user: {
         id: user.id,
+        phoneCountryCode: user.phoneCountryCode,
+        phoneNumber: user.phoneNumber,
         email: user.email,
         role: user.role
       }
@@ -156,5 +182,13 @@ export class AuthService {
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex')
+  }
+
+  private normalizePhoneCountryCode(phoneCountryCode?: string) {
+    return phoneCountryCode?.trim() || '+86'
+  }
+
+  private normalizePhoneNumber(phoneNumber: string) {
+    return phoneNumber.trim()
   }
 }
