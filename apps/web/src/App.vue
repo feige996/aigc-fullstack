@@ -37,6 +37,7 @@ interface GenerationTask {
   requestPayload: {
     prompt?: string
     ratio?: string
+    referenceAssetIds?: string[]
   }
   createdAt: string
   updatedAt: string
@@ -71,6 +72,32 @@ interface Project {
   updatedAt: string
 }
 
+interface Asset {
+  assetId: string
+  userId: string
+  projectId: string | null
+  taskId: string | null
+  type: string
+  status: string
+  provider: string
+  bucket: string
+  objectKey: string
+  mimeType: string
+  size: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+interface CreateAssetUploadResponse {
+  asset: Asset
+  upload: {
+    method: 'PUT'
+    url: string
+    headers: Record<string, string>
+    expiresInSeconds: number
+  }
+}
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.web.auth'
@@ -85,6 +112,8 @@ const projects = ref<Project[]>([])
 const selectedProjectId = ref('')
 const projectName = ref('Default Project')
 const projectDescription = ref('')
+const assets = ref<Asset[]>([])
+const selectedAssetIds = ref<string[]>([])
 const prompt = ref('a clean product photo of a ceramic cup')
 const ratio = ref('1:1')
 const activeTaskId = ref('')
@@ -92,6 +121,7 @@ const activeTask = ref<GenerationTask | null>(null)
 const tasks = ref<GenerationTask[]>([])
 const isSubmitting = ref(false)
 const isCreatingProject = ref(false)
+const isUploadingAsset = ref(false)
 const isRefreshing = ref(false)
 const isCanceling = ref(false)
 const isChangingPassword = ref(false)
@@ -175,6 +205,7 @@ async function authenticate(mode: 'login' | 'register') {
     const result = (await response.json()) as AuthResponse
     storeAuth(result)
     await loadProjects()
+    await loadAssets()
     await loadTasks()
     connectEvents()
   } catch (error) {
@@ -271,6 +302,8 @@ async function signOut(callServer = true) {
   tasks.value = []
   projects.value = []
   selectedProjectId.value = ''
+  assets.value = []
+  selectedAssetIds.value = []
   localStorage.removeItem(authStorageKey)
 }
 
@@ -327,6 +360,89 @@ async function createProject() {
   }
 }
 
+async function loadAssets() {
+  if (!accessToken.value) {
+    return
+  }
+
+  const response = await apiFetch('/assets')
+
+  if (!response.ok) {
+    return
+  }
+
+  const result = (await response.json()) as { items: Asset[] }
+  assets.value = result.items
+}
+
+async function uploadAsset(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+
+  if (!file) {
+    return
+  }
+
+  errorMessage.value = ''
+  successMessage.value = ''
+  isUploadingAsset.value = true
+
+  try {
+    const createResponse = await apiFetch('/assets/uploads', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        type: 'user_upload',
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        size: file.size,
+        projectId: selectedProjectId.value || undefined
+      })
+    })
+
+    if (!createResponse.ok) {
+      throw new Error(`Create upload failed: ${createResponse.status}`)
+    }
+
+    const uploadInfo = (await createResponse.json()) as CreateAssetUploadResponse
+    const putResponse = await fetch(uploadInfo.upload.url, {
+      method: uploadInfo.upload.method,
+      headers: uploadInfo.upload.headers,
+      body: file
+    })
+
+    if (!putResponse.ok) {
+      throw new Error(`Upload failed: ${putResponse.status}`)
+    }
+
+    const confirmResponse = await apiFetch(`/assets/${uploadInfo.asset.assetId}/confirm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        size: file.size
+      })
+    })
+
+    if (!confirmResponse.ok) {
+      throw new Error(`Confirm upload failed: ${confirmResponse.status}`)
+    }
+
+    const asset = (await confirmResponse.json()) as Asset
+    assets.value = [asset, ...assets.value.filter((item) => item.assetId !== asset.assetId)]
+    selectedAssetIds.value = Array.from(new Set([asset.assetId, ...selectedAssetIds.value]))
+    successMessage.value = 'Asset uploaded.'
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Upload asset failed'
+  } finally {
+    input.value = ''
+    isUploadingAsset.value = false
+  }
+}
+
 async function createTask() {
   errorMessage.value = ''
   successMessage.value = ''
@@ -343,7 +459,8 @@ async function createTask() {
         type: 'text_to_image',
         model: 'mock-image-v1',
         prompt: prompt.value,
-        ratio: ratio.value
+        ratio: ratio.value,
+        referenceAssetIds: selectedAssetIds.value
       })
     })
 
@@ -500,6 +617,7 @@ function connectEvents() {
 onMounted(async () => {
   await loadProfile()
   await loadProjects()
+  await loadAssets()
   await loadTasks()
   connectEvents()
 })
@@ -592,6 +710,26 @@ onBeforeUnmount(() => {
         </button>
       </section>
 
+      <section class="panel asset-panel">
+        <h2>Assets</h2>
+        <label>
+          Upload Asset
+          <input type="file" :disabled="isUploadingAsset" @change="uploadAsset" />
+        </label>
+        <label>
+          Reference Assets
+          <select v-model="selectedAssetIds" multiple size="4">
+            <option v-for="asset in assets" :key="asset.assetId" :value="asset.assetId">
+              {{ asset.assetId }} / {{ asset.status }}
+            </option>
+          </select>
+        </label>
+        <div class="asset-summary">
+          <strong>{{ selectedAssetIds.length }}</strong>
+          <span>selected</span>
+        </div>
+      </section>
+
       <section class="panel">
         <label for="prompt">Prompt</label>
         <textarea id="prompt" v-model="prompt" rows="5" />
@@ -633,6 +771,10 @@ onBeforeUnmount(() => {
           <div>
             <dt>Project ID</dt>
             <dd>{{ activeTask.projectId ?? 'none' }}</dd>
+          </div>
+          <div>
+            <dt>Assets</dt>
+            <dd>{{ activeTask.requestPayload.referenceAssetIds?.join(', ') || 'none' }}</dd>
           </div>
           <div>
             <dt>Status</dt>
@@ -804,6 +946,29 @@ textarea {
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   align-items: end;
   gap: 12px;
+}
+
+.asset-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.asset-panel h2 {
+  grid-column: 1 / -1;
+}
+
+.asset-summary {
+  display: grid;
+  gap: 4px;
+  min-width: 96px;
+  color: #3f4754;
+}
+
+.asset-summary strong {
+  color: #17202a;
+  font-size: 24px;
 }
 
 .project-panel h2 {
