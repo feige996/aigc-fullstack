@@ -144,6 +144,29 @@ export const providerCapabilities = [
 
 export type ProviderCapability = (typeof providerCapabilities)[number];
 
+export interface FeatureRoute {
+  path: string;
+  label: string;
+  entry: string;
+}
+
+export interface FeatureAdminMenu {
+  path: string;
+  label: string;
+  entry: string;
+  requiredRoles?: Array<'admin' | 'super_admin'>;
+}
+
+export interface FeatureManifest {
+  domain: TaskDomain;
+  name: string;
+  description?: string;
+  taskTypes: TaskType[];
+  providerCapabilities: ProviderCapability[];
+  webRoutes?: FeatureRoute[];
+  adminMenus?: FeatureAdminMenu[];
+}
+
 export const rabbitExchanges = {
   generationRequest: 'generation.request',
   generationResult: 'generation.result',
