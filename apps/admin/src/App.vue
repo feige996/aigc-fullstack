@@ -53,6 +53,7 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/a
 const tasks = ref<GenerationTask[]>([])
 const selectedTask = ref<GenerationTask | null>(null)
 const isLoading = ref(false)
+const isRetrying = ref(false)
 const errorMessage = ref('')
 
 const totalTasks = computed(() => tasks.value.length)
@@ -94,6 +95,41 @@ async function selectTask(task: GenerationTask) {
   }
 
   selectedTask.value = (await response.json()) as GenerationTask
+}
+
+async function retrySelectedTask() {
+  if (!selectedTask.value) {
+    return
+  }
+
+  isRetrying.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/generation/tasks/${selectedTask.value.taskId}/retry`, {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      throw new Error(`Retry task failed: ${response.status}`)
+    }
+
+    const retried = (await response.json()) as { taskId: string }
+    await loadTasks()
+    const task = tasks.value.find((item) => item.taskId === retried.taskId)
+
+    if (task) {
+      await selectTask(task)
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Retry task failed'
+  } finally {
+    isRetrying.value = false
+  }
+}
+
+function canRetry(task: GenerationTask | null) {
+  return Boolean(task && task.status !== 'succeeded' && task.status !== 'running' && task.status !== 'retrying')
 }
 
 function statusType(status: TaskStatus) {
@@ -178,7 +214,20 @@ onMounted(() => {
             </el-card>
 
             <el-card shadow="never" class="detail-card">
-              <template #header>Task Detail</template>
+              <template #header>
+                <div class="detail-header">
+                  <span>Task Detail</span>
+                  <el-button
+                    type="warning"
+                    size="small"
+                    :disabled="!canRetry(selectedTask)"
+                    :loading="isRetrying"
+                    @click="retrySelectedTask"
+                  >
+                    Retry
+                  </el-button>
+                </div>
+              </template>
               <el-empty v-if="!selectedTask" description="No task selected" />
               <template v-else>
                 <el-descriptions :column="1" border>
@@ -296,6 +345,12 @@ onMounted(() => {
 .detail-card h2 {
   margin: 20px 0 10px;
   font-size: 16px;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 @media (max-width: 1100px) {

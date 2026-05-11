@@ -38,4 +38,12 @@ export class GenerationController {
       taskId
     })
   }
+
+  @Post(':taskId/retry')
+  retryTask(@Param('taskId') taskId: string) {
+    return this.generationService.retryTask({
+      userId: 'mock_user_001',
+      taskId
+    })
+  }
 }

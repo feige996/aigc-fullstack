@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import type { GenerationRequestMessage } from '@aigc/shared-contracts'
+import type { Prisma } from '@prisma/client'
 import { createHash, randomUUID } from 'node:crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateGenerationTaskDto } from './dto/create-generation-task.dto'
@@ -19,6 +20,16 @@ interface GetTaskInput extends UserScopedInput {
   taskId: string
 }
 
+interface RequestPayload {
+  clientRequestId?: string
+  type: string
+  model: string
+  prompt: string
+  ratio?: string
+  duration?: number
+  referenceAssetIds: string[]
+}
+
 @Injectable()
 export class GenerationService {
   constructor(
@@ -28,7 +39,7 @@ export class GenerationService {
   ) {}
 
   async createTask({ userId, dto }: CreateTaskInput) {
-    const requestPayload = {
+    const requestPayload: RequestPayload = {
       clientRequestId: dto.clientRequestId,
       type: dto.type,
       model: dto.model,
@@ -38,9 +49,7 @@ export class GenerationService {
       referenceAssetIds: dto.referenceAssetIds ?? []
     }
 
-    const requestPayloadHash = createHash('sha256')
-      .update(JSON.stringify(requestPayload))
-      .digest('hex')
+    const requestPayloadHash = this.hashPayload(requestPayload)
 
     const task = await this.prisma.$transaction(async (tx) => {
       const createdTask = await tx.generationTask.create({
@@ -51,7 +60,7 @@ export class GenerationService {
           status: 'pending',
           stage: 'queue_publish',
           billingStatus: 'none',
-          requestPayload,
+          requestPayload: this.toJson(requestPayload),
           maxAttempts: 3
         }
       })
@@ -78,108 +87,77 @@ export class GenerationService {
       })
     })
 
-    const attempt = task.currentAttempt
-
-    if (!attempt) {
-      throw new Error(`Task ${task.id} was created without current attempt`)
-    }
-
-    const traceId = randomUUID()
-    const message: GenerationRequestMessage = {
-      traceId,
-      taskId: task.id,
-      attemptId: attempt.id,
+    return this.publishAttempt({
       userId,
-      type: dto.type,
-      model: dto.model,
-      input: {
-        prompt: dto.prompt,
-        ratio: dto.ratio,
-        duration: dto.duration,
-        referenceAssetIds: dto.referenceAssetIds ?? []
+      taskId: task.id,
+      requestPayload,
+      attempt: task.currentAttempt
+    })
+  }
+
+  async retryTask({ userId, taskId }: GetTaskInput) {
+    const existingTask = await this.prisma.generationTask.findFirst({
+      where: {
+        id: taskId,
+        userId
       },
-      idempotencyKey: attempt.idempotencyKey,
-      attempt: attempt.attemptNo
+      include: {
+        attempts: {
+          orderBy: {
+            attemptNo: 'desc'
+          }
+        }
+      }
+    })
+
+    if (!existingTask) {
+      throw new NotFoundException(`Generation task ${taskId} was not found`)
     }
 
-    try {
-      await this.generationPublisher.publishGenerationRequest(message)
-
-      const queuedTask = await this.prisma.$transaction(async (tx) => {
-        await tx.generationTaskAttempt.update({
-          where: { id: attempt.id },
-          data: {
-            status: 'queued'
-          }
-        })
-
-        return tx.generationTask.update({
-          where: { id: task.id },
-          data: {
-            status: 'queued'
-          },
-          include: {
-            currentAttempt: true
-          }
-        })
-      })
-
-      this.generationEvents.publishTaskEvent('task.queued', {
-        taskId: queuedTask.id,
-        status: queuedTask.status,
-        stage: queuedTask.stage,
-        failureCode: queuedTask.failureCode
-      })
-
-      return {
-        taskId: queuedTask.id,
-        attemptId: queuedTask.currentAttempt?.id,
-        traceId,
-        status: queuedTask.status,
-        stage: queuedTask.stage,
-        billingStatus: queuedTask.billingStatus
-      }
-    } catch {
-      const failedTask = await this.prisma.$transaction(async (tx) => {
-        await tx.generationTaskAttempt.update({
-          where: { id: attempt.id },
-          data: {
-            status: 'failed',
-            failureCode: 'QUEUE_PUBLISH_FAILED',
-            retryable: true,
-            endedAt: new Date()
-          }
-        })
-
-        return tx.generationTask.update({
-          where: { id: task.id },
-          data: {
-            status: 'failed',
-            failureCode: 'QUEUE_PUBLISH_FAILED'
-          },
-          include: {
-            currentAttempt: true
-          }
-        })
-      })
-
-      this.generationEvents.publishTaskEvent('task.failed', {
-        taskId: failedTask.id,
-        status: failedTask.status,
-        stage: failedTask.stage,
-        failureCode: failedTask.failureCode
-      })
-
-      return {
-        taskId: failedTask.id,
-        attemptId: failedTask.currentAttempt?.id,
-        traceId,
-        status: failedTask.status,
-        stage: failedTask.stage,
-        failureCode: failedTask.failureCode,
-        billingStatus: failedTask.billingStatus
-      }
+    if (existingTask.status === 'succeeded') {
+      throw new BadRequestException('Succeeded task cannot be retried')
     }
+
+    if (existingTask.attempts.length >= existingTask.maxAttempts) {
+      throw new BadRequestException('Task has reached max attempts')
+    }
+
+    const requestPayload = existingTask.requestPayload as unknown as RequestPayload
+    const nextAttemptNo = (existingTask.attempts[0]?.attemptNo ?? 0) + 1
+    const requestPayloadHash = this.hashPayload(requestPayload)
+
+    const task = await this.prisma.$transaction(async (tx) => {
+      const attempt = await tx.generationTaskAttempt.create({
+        data: {
+          taskId: existingTask.id,
+          attemptNo: nextAttemptNo,
+          status: 'pending',
+          stage: 'queue_publish',
+          idempotencyKey: `${existingTask.id}:attempt:${nextAttemptNo}:${randomUUID()}`,
+          requestPayloadHash
+        }
+      })
+
+      return tx.generationTask.update({
+        where: { id: existingTask.id },
+        data: {
+          status: 'retrying',
+          stage: 'queue_publish',
+          failureCode: null,
+          currentAttemptId: attempt.id
+        },
+        include: {
+          currentAttempt: true
+        }
+      })
+    })
+
+    return this.publishAttempt({
+      userId,
+      taskId: task.id,
+      requestPayload,
+      attempt: task.currentAttempt
+    })
   }
 
   async listTasks({ userId }: UserScopedInput) {
@@ -262,5 +240,130 @@ export class GenerationService {
       updatedAt: task.updatedAt.toISOString(),
       completedAt: task.completedAt?.toISOString() ?? null
     }
+  }
+
+  private async publishAttempt({
+    userId,
+    taskId,
+    requestPayload,
+    attempt
+  }: {
+    userId: string
+    taskId: string
+    requestPayload: RequestPayload
+    attempt?: {
+      id: string
+      attemptNo: number
+      idempotencyKey: string
+    } | null
+  }) {
+    if (!attempt) {
+      throw new Error(`Task ${taskId} was created without current attempt`)
+    }
+
+    const traceId = randomUUID()
+    const message: GenerationRequestMessage = {
+      traceId,
+      taskId,
+      attemptId: attempt.id,
+      userId,
+      type: requestPayload.type,
+      model: requestPayload.model,
+      input: {
+        prompt: requestPayload.prompt,
+        ratio: requestPayload.ratio,
+        duration: requestPayload.duration,
+        referenceAssetIds: requestPayload.referenceAssetIds ?? []
+      },
+      idempotencyKey: attempt.idempotencyKey,
+      attempt: attempt.attemptNo
+    }
+
+    try {
+      await this.generationPublisher.publishGenerationRequest(message)
+
+      const queuedTask = await this.prisma.$transaction(async (tx) => {
+        await tx.generationTaskAttempt.update({
+          where: { id: attempt.id },
+          data: {
+            status: 'queued'
+          }
+        })
+
+        return tx.generationTask.update({
+          where: { id: taskId },
+          data: {
+            status: 'queued'
+          },
+          include: {
+            currentAttempt: true
+          }
+        })
+      })
+
+      this.generationEvents.publishTaskEvent('task.queued', {
+        taskId: queuedTask.id,
+        status: queuedTask.status,
+        stage: queuedTask.stage,
+        failureCode: queuedTask.failureCode
+      })
+
+      return {
+        taskId: queuedTask.id,
+        attemptId: queuedTask.currentAttempt?.id,
+        traceId,
+        status: queuedTask.status,
+        stage: queuedTask.stage,
+        billingStatus: queuedTask.billingStatus
+      }
+    } catch {
+      const failedTask = await this.prisma.$transaction(async (tx) => {
+        await tx.generationTaskAttempt.update({
+          where: { id: attempt.id },
+          data: {
+            status: 'failed',
+            failureCode: 'QUEUE_PUBLISH_FAILED',
+            retryable: true,
+            endedAt: new Date()
+          }
+        })
+
+        return tx.generationTask.update({
+          where: { id: taskId },
+          data: {
+            status: 'failed',
+            failureCode: 'QUEUE_PUBLISH_FAILED'
+          },
+          include: {
+            currentAttempt: true
+          }
+        })
+      })
+
+      this.generationEvents.publishTaskEvent('task.failed', {
+        taskId: failedTask.id,
+        status: failedTask.status,
+        stage: failedTask.stage,
+        failureCode: failedTask.failureCode
+      })
+
+      return {
+        taskId: failedTask.id,
+        attemptId: failedTask.currentAttempt?.id,
+        traceId,
+        status: failedTask.status,
+        stage: failedTask.stage,
+        failureCode: failedTask.failureCode,
+        billingStatus: failedTask.billingStatus
+      }
+    }
+  }
+
+  private hashPayload(payload: RequestPayload) {
+    return createHash('sha256').update(JSON.stringify(payload)).digest('hex')
+  }
+
+  private toJson(payload: RequestPayload): Prisma.InputJsonValue {
+    return JSON.parse(JSON.stringify(payload)) as Prisma.InputJsonValue
   }
 }
