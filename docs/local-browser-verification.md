@@ -1,6 +1,6 @@
 # Local Browser Verification
 
-This guide verifies the current mock generation flow in a browser:
+This guide verifies the current mock generation flow in a browser and with a command-line smoke script:
 
 ```txt
 Web -> API -> MySQL -> RabbitMQ -> AI worker -> RabbitMQ -> API -> SSE -> Web/Admin
@@ -114,6 +114,62 @@ http://localhost:5174
 5. For failed or canceled tasks, try `Retry`.
 6. For active tasks, try `Cancel`.
 
+## Verify With Smoke Script
+
+The smoke script checks the API and worker path without opening a browser:
+
+```txt
+Login -> /auth/me -> create generation task -> poll task detail -> expect succeeded
+```
+
+It requires:
+
+- API running at `http://localhost:3000/api`.
+- AI Worker running and consuming `image.generate.queue`.
+- RabbitMQ and MySQL running.
+- The demo user exists.
+
+Default credentials:
+
+```txt
+Phone: 13800138000
+Password: password123
+```
+
+Run from the repository root:
+
+```bash
+pnpm smoke:generation
+```
+
+Use a different API URL or account:
+
+```bash
+API_BASE_URL='http://localhost:3001/api' \
+SMOKE_PHONE_NUMBER='13800138000' \
+SMOKE_PASSWORD='password123' \
+pnpm smoke:generation
+```
+
+Useful options:
+
+```txt
+SMOKE_PROMPT       Prompt text. Default: smoke test product photo
+SMOKE_TIMEOUT_MS   Poll timeout. Default: 30000
+SMOKE_INTERVAL_MS  Poll interval. Default: 1000
+```
+
+Expected output shape:
+
+```txt
+[smoke] authenticated user=13800138000 role=user
+[smoke] profile id=...
+[smoke] created task=... status=queued
+[smoke] poll task=... status=queued
+[smoke] poll task=... status=succeeded
+[smoke] final task=... status=succeeded stage=completed
+```
+
 ## Verify RabbitMQ
 
 Open RabbitMQ Management:
@@ -143,21 +199,29 @@ During normal idle state, both queues should usually have `0` messages. If the A
 List tasks:
 
 ```bash
-curl -sS http://localhost:3000/api/generation/tasks
+TOKEN=$(curl -sS -X POST http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"phoneNumber":"13800138000","password":"password123"}' \
+  | node -pe 'JSON.parse(require("fs").readFileSync(0, "utf8")).accessToken')
+
+curl -sS http://localhost:3000/api/generation/tasks \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 Create a task:
 
 ```bash
 curl -sS -X POST http://localhost:3000/api/generation/tasks \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"type":"text_to_image","model":"mock-image-v1","prompt":"browser verification","ratio":"1:1"}'
+  -d '{"type":"text_to_image","model":"mock-image-v1","prompt":"browser verification","ratio":"1:1","referenceAssetIds":[]}'
 ```
 
 Cancel a task:
 
 ```bash
-curl -sS -X POST http://localhost:3000/api/generation/tasks/<taskId>/cancel
+curl -sS -X POST http://localhost:3000/api/generation/tasks/<taskId>/cancel \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 Check queues:
@@ -188,6 +252,18 @@ API_BASE_URL
 ```
 
 Also check `image.generate.queue` in RabbitMQ Management.
+
+If the smoke script times out, check whether the worker is running with the same API port:
+
+```txt
+API_BASE_URL=http://localhost:3000/api
+```
+
+If API was started on `PORT=3001`, the worker and smoke script must both use:
+
+```txt
+API_BASE_URL=http://localhost:3001/api
+```
 
 ### API Cannot Connect To MySQL
 

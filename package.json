@@ -8,6 +8,7 @@
     "lint": "turbo lint",
     "test": "turbo test",
     "typecheck": "turbo typecheck",
+    "smoke:generation": "node scripts/dev/smoke-generation.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,vue,json,md,yml,yaml}\""
   },
   "devDependencies": {
