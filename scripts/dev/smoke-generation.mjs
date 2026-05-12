@@ -39,7 +39,18 @@ async function main() {
     throw new Error(`Expected task ${task.taskId} to have at least one output asset`)
   }
 
-  log(`output assets=${outputAssets.length} first=${outputAssets[0].objectKey}`)
+  const firstAsset = outputAssets[0]
+  log(`output assets=${outputAssets.length} first=${firstAsset.objectKey}`)
+
+  const download = await apiFetch(`/assets/${firstAsset.assetId}/download`, auth.accessToken, {
+    method: 'POST'
+  })
+  const file = await downloadFile(download.url)
+  log(`download status=${file.status} contentType=${file.contentType} bytes=${file.byteLength}`)
+
+  if (file.byteLength === 0) {
+    throw new Error(`Expected downloaded asset ${firstAsset.assetId} to be non-empty`)
+  }
 }
 
 async function login() {
@@ -103,6 +114,22 @@ async function safeFetch(url, init) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     throw new Error(`Request failed: ${url} (${detail})`)
+  }
+}
+
+async function downloadFile(url) {
+  const response = await safeFetch(url)
+
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.status} ${await response.text()}`)
+  }
+
+  const buffer = await response.arrayBuffer()
+
+  return {
+    status: response.status,
+    contentType: response.headers.get('content-type') ?? 'unknown',
+    byteLength: buffer.byteLength
   }
 }
 

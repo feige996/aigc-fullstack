@@ -48,7 +48,29 @@ export interface GenerationTaskRecord {
   completedAt: Date | null
   currentAttempt?: unknown
   attempts?: unknown[]
-  assets?: unknown[]
+  assets?: GenerationTaskAssetRecord[]
+}
+
+export interface GenerationTaskAssetRecord {
+  id: string
+  userId: string
+  projectId: string | null
+  taskId: string | null
+  type: string
+  status: string
+  provider: string
+  bucket: string
+  objectKey: string
+  mimeType: string
+  size: number | null
+  checksum: string | null
+  width: number | null
+  height: number | null
+  duration: number | null
+  expiresAt: Date | null
+  deletedAt: Date | null
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface PublishAttemptInput {

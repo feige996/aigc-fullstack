@@ -1,7 +1,11 @@
 import type { Prisma } from '@prisma/client'
 import { createHash } from 'node:crypto'
 import type { AuthenticatedUser } from '../auth/auth.types'
-import type { GenerationRequestPayload, GenerationTaskRecord } from './generation.types'
+import type {
+  GenerationRequestPayload,
+  GenerationTaskAssetRecord,
+  GenerationTaskRecord
+} from './generation.types'
 
 export function serializeGenerationTask(task: GenerationTaskRecord) {
   return {
@@ -19,10 +23,34 @@ export function serializeGenerationTask(task: GenerationTaskRecord) {
     requestPayload: task.requestPayload,
     currentAttempt: task.currentAttempt,
     attempts: task.attempts,
-    assets: task.assets,
+    assets: task.assets?.map((asset) => serializeGenerationAsset(asset)),
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
     completedAt: task.completedAt?.toISOString() ?? null
+  }
+}
+
+function serializeGenerationAsset(asset: GenerationTaskAssetRecord) {
+  return {
+    assetId: asset.id,
+    userId: asset.userId,
+    projectId: asset.projectId,
+    taskId: asset.taskId,
+    type: asset.type,
+    status: asset.status,
+    provider: asset.provider,
+    bucket: asset.bucket,
+    objectKey: asset.objectKey,
+    mimeType: asset.mimeType,
+    size: asset.size,
+    checksum: asset.checksum,
+    width: asset.width,
+    height: asset.height,
+    duration: asset.duration,
+    expiresAt: asset.expiresAt?.toISOString() ?? null,
+    deletedAt: asset.deletedAt?.toISOString() ?? null,
+    createdAt: asset.createdAt.toISOString(),
+    updatedAt: asset.updatedAt.toISOString()
   }
 }
 

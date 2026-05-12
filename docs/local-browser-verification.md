@@ -116,10 +116,10 @@ http://localhost:5174
 
 ## Verify With Smoke Script
 
-The smoke script checks the API and worker path without opening a browser:
+The smoke script checks the API, worker, asset, and download path without opening a browser:
 
 ```txt
-Login -> /auth/me -> create generation task -> poll task detail -> expect succeeded
+Login -> /auth/me -> create generation task -> poll task detail -> expect succeeded -> download output asset
 ```
 
 It requires:
@@ -169,6 +169,7 @@ Expected output shape:
 [smoke] poll task=... status=succeeded
 [smoke] final task=... status=succeeded stage=completed
 [smoke] output assets=1 first=aigc/mock/.../output.png
+[smoke] download status=200 contentType=image/png bytes=68
 ```
 
 ## Verify RabbitMQ
