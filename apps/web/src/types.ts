@@ -82,6 +82,9 @@ export interface Asset {
   objectKey: string
   mimeType: string
   size: number | null
+  width?: number | null
+  height?: number | null
+  duration?: number | null
   createdAt: string
   updatedAt: string
 }

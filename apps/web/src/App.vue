@@ -866,6 +866,48 @@ dd {
   white-space: nowrap;
 }
 
+.output-assets {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.output-assets h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.output-list {
+  display: grid;
+  gap: 8px;
+}
+
+.output-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+}
+
+.output-row div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.output-row span {
+  overflow: hidden;
+  color: #687386;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.output-row small {
+  color: #687386;
+}
+
 @media (max-width: 640px) {
   .header,
   .header-actions,
@@ -881,6 +923,10 @@ dd {
   }
 
   dl div {
+    grid-template-columns: 1fr;
+  }
+
+  .output-row {
     grid-template-columns: 1fr;
   }
 }

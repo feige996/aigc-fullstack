@@ -65,36 +65,54 @@ defineEmits<{
 
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
-    <dl v-if="activeTask">
-      <div>
-        <dt>Task ID</dt>
-        <dd>{{ activeTask.taskId }}</dd>
+    <template v-if="activeTask">
+      <dl>
+        <div>
+          <dt>Task ID</dt>
+          <dd>{{ activeTask.taskId }}</dd>
+        </div>
+        <div>
+          <dt>Project ID</dt>
+          <dd>{{ activeTask.projectId ?? 'none' }}</dd>
+        </div>
+        <div>
+          <dt>Assets</dt>
+          <dd>{{ activeTask.requestPayload.referenceAssetIds?.join(', ') || 'none' }}</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>{{ activeTask.status }}</dd>
+        </div>
+        <div>
+          <dt>Stage</dt>
+          <dd>{{ activeTask.stage }}</dd>
+        </div>
+        <div>
+          <dt>Model</dt>
+          <dd>{{ activeTask.model }}</dd>
+        </div>
+        <div>
+          <dt>Updated</dt>
+          <dd>{{ activeTask.updatedAt }}</dd>
+        </div>
+      </dl>
+      <div class="output-assets">
+        <h3>Outputs</h3>
+        <div v-if="activeTask.assets?.length" class="output-list">
+          <article v-for="asset in activeTask.assets" :key="asset.assetId" class="output-row">
+            <div>
+              <strong>{{ asset.type }} / {{ asset.status }}</strong>
+              <span>{{ asset.objectKey }}</span>
+            </div>
+            <small>
+              {{ asset.mimeType }}
+              <template v-if="asset.width && asset.height"> / {{ asset.width }}x{{ asset.height }}</template>
+            </small>
+          </article>
+        </div>
+        <p v-else class="muted">No output assets.</p>
       </div>
-      <div>
-        <dt>Project ID</dt>
-        <dd>{{ activeTask.projectId ?? 'none' }}</dd>
-      </div>
-      <div>
-        <dt>Assets</dt>
-        <dd>{{ activeTask.requestPayload.referenceAssetIds?.join(', ') || 'none' }}</dd>
-      </div>
-      <div>
-        <dt>Status</dt>
-        <dd>{{ activeTask.status }}</dd>
-      </div>
-      <div>
-        <dt>Stage</dt>
-        <dd>{{ activeTask.stage }}</dd>
-      </div>
-      <div>
-        <dt>Model</dt>
-        <dd>{{ activeTask.model }}</dd>
-      </div>
-      <div>
-        <dt>Updated</dt>
-        <dd>{{ activeTask.updatedAt }}</dd>
-      </div>
-    </dl>
+    </template>
     <p v-else class="muted">No active task.</p>
   </section>
 

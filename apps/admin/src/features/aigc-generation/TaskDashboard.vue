@@ -109,6 +109,19 @@ defineEmits<{
           <el-table-column prop="stage" label="Stage" width="150" />
           <el-table-column prop="failureCode" label="Failure" min-width="160" />
         </el-table>
+
+        <h2>Outputs</h2>
+        <el-table :data="selectedTask.assets ?? []" size="small" border>
+          <el-table-column prop="type" label="Type" width="150" />
+          <el-table-column prop="status" label="Status" width="100" />
+          <el-table-column prop="provider" label="Provider" width="140" />
+          <el-table-column prop="objectKey" label="Object Key" min-width="220" show-overflow-tooltip />
+          <el-table-column label="Size" width="110">
+            <template #default="{ row }">
+              {{ row.width && row.height ? `${row.width}x${row.height}` : '-' }}
+            </template>
+          </el-table-column>
+        </el-table>
       </template>
     </el-card>
   </section>
