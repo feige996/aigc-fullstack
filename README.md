@@ -88,7 +88,7 @@ MinIO Console：http://localhost:9001
 
 ## 本地开发
 
-启动所有 Node workspace 开发任务：
+启动所有应用开发任务：
 
 ```bash
 pnpm dev
@@ -100,13 +100,7 @@ pnpm dev
 pnpm --filter @aigc/web dev
 pnpm --filter @aigc/admin dev
 pnpm --filter @aigc/api dev
-```
-
-启动 AI 服务：
-
-```bash
-cd apps/ai-service
-uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+pnpm --filter @aigc/ai-service dev
 ```
 
 ## 构建和检查
