@@ -142,6 +142,7 @@ apps/api/src/generation/generation.serializer.ts
 
 ```txt
 apps/ai-service/src/workers/image_generate_worker.py
+apps/ai-service/src/workers/result_messages.py
 ```
 
 当前 provider 抽象：
@@ -150,7 +151,7 @@ apps/ai-service/src/workers/image_generate_worker.py
 apps/ai-service/src/providers/
 ```
 
-其中 provider registry 是 platform 候选能力，`image_generate_worker.py` 是 AIGC feature 候选实现。
+其中 provider registry 是 platform 候选能力，`image_generate_worker.py` 和 `result_messages.py` 是 AIGC feature 候选实现。
 
 ## 迁移目标目录
 

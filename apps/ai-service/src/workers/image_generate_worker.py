@@ -8,7 +8,6 @@ from ..config import settings
 from ..contracts import (
     GenerationExecutionState,
     GenerationRequestMessage,
-    GenerationResultMessage,
 )
 from ..providers import create_provider_registry
 from ..providers.base import ProviderError
@@ -17,9 +16,8 @@ from ..rabbitmq import (
     GENERATION_REQUEST_EXCHANGE,
     IMAGE_GENERATE_QUEUE,
     IMAGE_GENERATE_ROUTING_KEY,
-    TASK_FAILED_ROUTING_KEY,
-    TASK_SUCCEEDED_ROUTING_KEY,
 )
+from .result_messages import build_failed_result, build_success_result
 
 logger = logging.getLogger(__name__)
 
@@ -85,43 +83,24 @@ class ImageGenerateWorker:
 
             try:
                 provider_result = await self.provider_registry.generate(task)
-                result = GenerationResultMessage(
-                    traceId=task.trace_id,
-                    taskId=task.task_id,
-                    attemptId=task.attempt_id,
-                    status="succeeded",
-                    provider=provider_result.provider,
-                    outputs=provider_result.outputs,
-                    usage=provider_result.usage,
-                    error=None,
-                )
-                routing_key = TASK_FAILED_ROUTING_KEY
+                worker_result = build_success_result(task, provider_result)
             except ProviderError as error:
-                result = GenerationResultMessage(
-                    traceId=task.trace_id,
-                    taskId=task.task_id,
-                    attemptId=task.attempt_id,
-                    status="failed",
-                    provider="unknown",
-                    outputs=[],
-                    usage=None,
-                    error={
-                        "code": error.code,
-                        "message": error.message,
-                        "retryable": error.retryable,
-                    },
-                )
-                routing_key = TASK_SUCCEEDED_ROUTING_KEY
+                worker_result = build_failed_result(task, error)
 
             await result_exchange.publish(
                 aio_pika.Message(
-                    body=result.model_dump_json(by_alias=True).encode("utf-8"),
+                    body=worker_result.message.model_dump_json(by_alias=True).encode("utf-8"),
                     content_type="application/json",
                     delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
                 ),
-                routing_key=routing_key,
+                routing_key=worker_result.routing_key,
             )
-            logger.info("Published provider result task_id=%s status=%s", task.task_id, result.status)
+            logger.info(
+                "Published provider result task_id=%s status=%s routing_key=%s",
+                task.task_id,
+                worker_result.message.status,
+                worker_result.routing_key,
+            )
 
     async def fetch_execution_state(self, task: GenerationRequestMessage) -> GenerationExecutionState:
         url = f"{settings.api_base_url}/generation/tasks/{task.task_id}/attempts/{task.attempt_id}/execution-state"
