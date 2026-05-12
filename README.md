@@ -88,20 +88,75 @@ MinIO Console：http://localhost:9001
 
 ## 本地开发
 
-启动所有应用开发任务：
+默认启动完整本地开发环境：
 
 ```bash
 pnpm dev
 ```
 
-启动单个应用：
+`pnpm dev` 会启动：
+
+```txt
+@aigc/web#dev             用户端 Web
+@aigc/admin#dev           运营后台 Admin
+@aigc/api#dev             NestJS API
+@aigc/ai-service#dev      FastAPI AI HTTP 服务
+@aigc/ai-service#worker  RabbitMQ 队列 worker
+```
+
+如果只想启动应用开发服务，不启动 AI worker：
+
+```bash
+pnpm dev:apps
+```
+
+`pnpm dev:apps` 会启动 Web、Admin、API 和 AI Service HTTP 服务，不启动
+`@aigc/ai-service#worker`。
+
+如果只需要调试用户端生成链路：
+
+```bash
+pnpm dev:generation
+```
+
+`pnpm dev:generation` 只启动 Web、API 和 AI worker，不启动 Admin，也不启动
+AI Service HTTP 服务。
+
+启动单个应用或 worker：
 
 ```bash
 pnpm --filter @aigc/web dev
 pnpm --filter @aigc/admin dev
 pnpm --filter @aigc/api dev
 pnpm --filter @aigc/ai-service dev
+pnpm --filter @aigc/ai-service worker
 ```
+
+其中 `pnpm --filter @aigc/ai-service dev` 启动的是 AI Service 的 FastAPI HTTP 服务。
+`pnpm --filter @aigc/ai-service worker` 是队列常驻进程，启动后保持运行，不要关闭终端。worker 会一直监听 RabbitMQ 的 `image.generate.queue`，消费 API 发布的生成任务，并把成功或失败结果发回 API。
+
+本地调试完整生成链路时，先启动基础设施：
+
+```bash
+docker compose -f infra/compose/docker-compose.yml up -d
+```
+
+然后启动完整本地开发环境：
+
+```bash
+pnpm dev
+```
+
+### queued 状态排查
+
+如果任务一直停在 `queued` / `queue_publish`，检查队列是否有 worker consumer：
+
+```bash
+docker exec aigc-rabbitmq rabbitmqctl list_queues name messages consumers
+```
+
+如果 `image.generate.queue` 有消息但 `consumers` 是 `0`，说明 AI worker 没有运行或没有连上
+RabbitMQ。
 
 ## 构建和检查
 

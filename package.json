@@ -3,7 +3,9 @@
   "private": true,
   "packageManager": "pnpm@10.10.0",
   "scripts": {
-    "dev": "turbo dev --filter=./apps/*",
+    "dev": "turbo run dev @aigc/ai-service#worker '--filter=./apps/*'",
+    "dev:apps": "turbo dev '--filter=./apps/*'",
+    "dev:generation": "turbo run @aigc/web#dev @aigc/api#dev @aigc/ai-service#worker",
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
