@@ -28,7 +28,7 @@ export interface GenerationAttempt {
   endedAt: string | null
 }
 
-export interface GenerationTask {
+export interface Task {
   taskId: string
   userId: string
   type: string
@@ -38,7 +38,9 @@ export interface GenerationTask {
   failureCode: string | null
   billingStatus: string
   currentAttemptId: string | null
-  requestPayload: {
+  resultPayload?: unknown | null
+  usagePayload?: unknown | null
+  inputPayload: {
     prompt?: string
     ratio?: string
   }

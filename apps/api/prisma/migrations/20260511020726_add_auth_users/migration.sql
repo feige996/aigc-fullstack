@@ -31,11 +31,11 @@ CREATE TABLE `refresh_tokens` (
 -- Backfill the legacy local mock user before adding the foreign key.
 INSERT INTO `users` (`id`, `email`, `password_hash`, `display_name`, `role`, `created_at`, `updated_at`)
 SELECT 'mock_user_001', 'mock-user@example.local', 'legacy_mock_user_no_login', 'Legacy Mock User', 'user', CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
-WHERE EXISTS (SELECT 1 FROM `generation_tasks` WHERE `user_id` = 'mock_user_001')
+WHERE EXISTS (SELECT 1 FROM `tasks` WHERE `user_id` = 'mock_user_001')
   AND NOT EXISTS (SELECT 1 FROM `users` WHERE `id` = 'mock_user_001');
 
 -- AddForeignKey
-ALTER TABLE `generation_tasks` ADD CONSTRAINT `generation_tasks_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `tasks` ADD CONSTRAINT `tasks_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `refresh_tokens` ADD CONSTRAINT `refresh_tokens_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

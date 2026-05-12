@@ -1,9 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
-import type { GenerationResultMessage } from '@aigc/shared-contracts'
+import type { TaskResultMessage } from '@aigc/shared-contracts'
 import { PrismaService } from '../prisma/prisma.service'
 import { RabbitmqService } from '../rabbitmq/rabbitmq.service'
 import { GenerationEventsService } from './generation-events.service'
 import { buildOutputAssetCreates } from './generation-output-assets'
+import { toPrismaJson } from './generation.serializer'
 
 @Injectable()
 export class GenerationResultConsumerService implements OnModuleInit {
@@ -18,7 +19,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.rabbitmqService.consumeGenerationResults((message) =>
-        this.handleResult(message as GenerationResultMessage)
+        this.handleResult(message as TaskResultMessage)
       )
       this.logger.log('Consuming generation result messages')
     } catch (error) {
@@ -26,7 +27,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
     }
   }
 
-  private async handleResult(message: GenerationResultMessage) {
+  private async handleResult(message: TaskResultMessage) {
     if (message.status === 'succeeded') {
       await this.markSucceeded(message)
       return
@@ -35,9 +36,9 @@ export class GenerationResultConsumerService implements OnModuleInit {
     await this.markFailed(message)
   }
 
-  private async markSucceeded(message: GenerationResultMessage) {
+  private async markSucceeded(message: TaskResultMessage) {
     const updated = await this.prisma.$transaction(async (tx) => {
-      const task = await tx.generationTask.findUnique({
+      const task = await tx.task.findUnique({
         where: { id: message.taskId },
         select: {
           userId: true,
@@ -55,7 +56,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
         return false
       }
 
-      await tx.generationTaskAttempt.update({
+      await tx.taskAttempt.update({
         where: { id: message.attemptId },
         data: {
           status: 'succeeded',
@@ -80,11 +81,13 @@ export class GenerationResultConsumerService implements OnModuleInit {
         })
       }
 
-      await tx.generationTask.update({
+      await tx.task.update({
         where: { id: message.taskId },
         data: {
           status: 'succeeded',
           stage: 'completed',
+          resultPayload: toPrismaJson(message.outputs),
+          usagePayload: message.usage ? toPrismaJson(message.usage) : undefined,
           completedAt: new Date()
         }
       })
@@ -107,9 +110,9 @@ export class GenerationResultConsumerService implements OnModuleInit {
     this.logger.log(`Marked generation task ${message.taskId} as succeeded`)
   }
 
-  private async markFailed(message: GenerationResultMessage) {
+  private async markFailed(message: TaskResultMessage) {
     const updated = await this.prisma.$transaction(async (tx) => {
-      const task = await tx.generationTask.findUnique({
+      const task = await tx.task.findUnique({
         where: { id: message.taskId },
         select: {
           userId: true,
@@ -126,7 +129,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
         return false
       }
 
-      await tx.generationTaskAttempt.update({
+      await tx.taskAttempt.update({
         where: { id: message.attemptId },
         data: {
           status: 'failed',
@@ -137,11 +140,13 @@ export class GenerationResultConsumerService implements OnModuleInit {
         }
       })
 
-      await tx.generationTask.update({
+      await tx.task.update({
         where: { id: message.taskId },
         data: {
           status: 'failed',
-          failureCode: 'PROVIDER_FAILED'
+          failureCode: 'PROVIDER_FAILED',
+          resultPayload: message.error ? toPrismaJson({ error: message.error }) : undefined,
+          usagePayload: message.usage ? toPrismaJson(message.usage) : undefined
         }
       })
 

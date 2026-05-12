@@ -6,14 +6,14 @@ from pydantic import ValidationError
 
 from ..config import settings
 from ..contracts import (
-    GenerationExecutionState,
-    GenerationRequestMessage,
+    TaskExecutionState,
+    TaskRequestMessage,
 )
 from ..providers import create_provider_registry
 from ..providers.base import ProviderError
 from ..rabbitmq import (
-    GENERATION_RESULT_EXCHANGE,
-    GENERATION_REQUEST_EXCHANGE,
+    TASK_RESULT_EXCHANGE,
+    TASK_REQUEST_EXCHANGE,
     IMAGE_GENERATE_QUEUE,
     IMAGE_GENERATE_ROUTING_KEY,
 )
@@ -32,12 +32,12 @@ class ImageGenerateWorker:
         await channel.set_qos(prefetch_count=1)
 
         exchange = await channel.declare_exchange(
-            GENERATION_REQUEST_EXCHANGE,
+            TASK_REQUEST_EXCHANGE,
             aio_pika.ExchangeType.DIRECT,
             durable=True,
         )
         result_exchange = await channel.declare_exchange(
-            GENERATION_RESULT_EXCHANGE,
+            TASK_RESULT_EXCHANGE,
             aio_pika.ExchangeType.DIRECT,
             durable=True,
         )
@@ -58,13 +58,13 @@ class ImageGenerateWorker:
         async with message.process(requeue=False):
             try:
                 payload = json.loads(message.body.decode("utf-8"))
-                task = GenerationRequestMessage.model_validate(payload)
+                task = TaskRequestMessage.model_validate(payload)
             except (json.JSONDecodeError, UnicodeDecodeError, ValidationError):
-                logger.exception("Invalid generation request message")
+                logger.exception("Invalid task request message")
                 return
 
             logger.info(
-                "Received image generation task task_id=%s attempt_id=%s model=%s prompt=%s",
+                "Received image task task_id=%s attempt_id=%s model=%s prompt=%s",
                 task.task_id,
                 task.attempt_id,
                 task.model,
@@ -102,18 +102,18 @@ class ImageGenerateWorker:
                 worker_result.routing_key,
             )
 
-    async def fetch_execution_state(self, task: GenerationRequestMessage) -> GenerationExecutionState:
+    async def fetch_execution_state(self, task: TaskRequestMessage) -> TaskExecutionState:
         url = f"{settings.api_base_url}/generation/tasks/{task.task_id}/attempts/{task.attempt_id}/execution-state"
 
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 response = await client.get(url)
                 response.raise_for_status()
-                return GenerationExecutionState.model_validate(response.json())
+                return TaskExecutionState.model_validate(response.json())
         except (httpx.HTTPError, ValidationError):
             logger.exception(
                 "Failed to validate execution state task_id=%s attempt_id=%s",
                 task.task_id,
                 task.attempt_id,
             )
-            return GenerationExecutionState(executable=False, reason="EXECUTION_STATE_UNAVAILABLE")
+            return TaskExecutionState(executable=False, reason="EXECUTION_STATE_UNAVAILABLE")

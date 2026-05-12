@@ -1,22 +1,22 @@
 <script setup lang="ts">
-import type { Asset, GenerationTask, TaskStatus } from '../../types'
+import type { Asset, Task, TaskStatus } from '../../types'
 
 defineProps<{
-  tasks: GenerationTask[]
-  selectedTask: GenerationTask | null
+  tasks: Task[]
+  selectedTask: Task | null
   totalTasks: number
   succeededTasks: number
   failedTasks: number
   isLoading: boolean
   isRetrying: boolean
   isCanceling: boolean
-  canRetry: (task: GenerationTask | null) => boolean
-  canCancel: (task: GenerationTask | null) => boolean
+  canRetry: (task: Task | null) => boolean
+  canCancel: (task: Task | null) => boolean
   statusType: (status: TaskStatus) => string
 }>()
 
 defineEmits<{
-  selectTask: [task: GenerationTask]
+  selectTask: [task: Task]
   retrySelectedTask: []
   cancelSelectedTask: []
   downloadAsset: [asset: Asset]
@@ -98,8 +98,11 @@ defineEmits<{
           </el-descriptions-item>
           <el-descriptions-item label="Stage">{{ selectedTask.stage }}</el-descriptions-item>
           <el-descriptions-item label="Billing">{{ selectedTask.billingStatus }}</el-descriptions-item>
+          <el-descriptions-item label="Usage">
+            <pre>{{ JSON.stringify(selectedTask.usagePayload ?? null, null, 2) }}</pre>
+          </el-descriptions-item>
           <el-descriptions-item label="Prompt">
-            {{ selectedTask.requestPayload.prompt }}
+            {{ selectedTask.inputPayload.prompt }}
           </el-descriptions-item>
         </el-descriptions>
 

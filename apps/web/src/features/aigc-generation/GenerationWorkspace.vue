@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { Asset, GenerationTask } from '../../types'
+import type { Asset, Task } from '../../types'
 
 defineProps<{
   prompt: string
   ratio: string
   isSubmitting: boolean
   activeTaskId: string
-  activeTask: GenerationTask | null
-  tasks: GenerationTask[]
+  activeTask: Task | null
+  tasks: Task[]
   isRefreshing: boolean
   isCanceling: boolean
   errorMessage: string
@@ -19,7 +19,7 @@ defineEmits<{
   createTask: []
   refreshActiveTask: []
   cancelActiveTask: []
-  selectTask: [task: GenerationTask]
+  selectTask: [task: Task]
   downloadAsset: [asset: Asset]
 }>()
 </script>
@@ -78,7 +78,7 @@ defineEmits<{
         </div>
         <div>
           <dt>Assets</dt>
-          <dd>{{ activeTask.requestPayload.referenceAssetIds?.join(', ') || 'none' }}</dd>
+          <dd>{{ activeTask.inputPayload.referenceAssetIds?.join(', ') || 'none' }}</dd>
         </div>
         <div>
           <dt>Status</dt>
@@ -130,7 +130,7 @@ defineEmits<{
         class="task-row"
         @click="$emit('selectTask', task)"
       >
-        <span>{{ task.requestPayload.prompt }}</span>
+        <span>{{ task.inputPayload.prompt }}</span>
         <strong>{{ task.status }} / {{ task.projectId ?? 'none' }}</strong>
       </button>
     </div>

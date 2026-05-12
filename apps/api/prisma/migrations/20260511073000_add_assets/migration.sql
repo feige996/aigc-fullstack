@@ -31,4 +31,4 @@ ALTER TABLE `assets` ADD CONSTRAINT `assets_user_id_fkey` FOREIGN KEY (`user_id`
 
 ALTER TABLE `assets` ADD CONSTRAINT `assets_project_id_fkey` FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
-ALTER TABLE `assets` ADD CONSTRAINT `assets_task_id_fkey` FOREIGN KEY (`task_id`) REFERENCES `generation_tasks`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `assets` ADD CONSTRAINT `assets_task_id_fkey` FOREIGN KEY (`task_id`) REFERENCES `tasks`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;

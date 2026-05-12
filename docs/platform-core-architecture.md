@@ -160,7 +160,7 @@ apps/ai-service/src/features/
 
 ## 通用 Task 设计方向
 
-通用 task 不应该叫 `GenerationTask`，也不应该内置 prompt、ratio、novel、character 等业务字段。
+通用 task 不应该叫 `Task`，也不应该内置 prompt、ratio、novel、character 等业务字段。
 
 推荐长期字段：
 
@@ -186,7 +186,7 @@ task_attempts
   provider
   provider_task_id
   status
-  request_payload_hash
+  input_payload_hash
   raw_error
   started_at
   ended_at
@@ -253,8 +253,8 @@ search
 
 当前仍偏 feature：
 
-- `GenerationTask`
-- `GenerationTaskAttempt`
+- `Task`
+- `TaskAttempt`
 - `image_generate_worker`
 - Web 的 prompt/ratio 表单
 - Admin 的 Generation Tasks 页面

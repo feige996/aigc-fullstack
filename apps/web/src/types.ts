@@ -22,7 +22,7 @@ export interface CreateTaskResponse {
   billingStatus: string
 }
 
-export interface GenerationTask {
+export interface Task {
   taskId: string
   projectId: string | null
   type: string
@@ -31,7 +31,9 @@ export interface GenerationTask {
   stage: string
   failureCode: string | null
   billingStatus: string
-  requestPayload: {
+  resultPayload?: unknown | null
+  usagePayload?: unknown | null
+  inputPayload: {
     prompt?: string
     ratio?: string
     referenceAssetIds?: string[]

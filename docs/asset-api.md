@@ -115,7 +115,7 @@ Users see their own assets. `admin` and `super_admin` can see all assets.
 When the AI worker publishes a succeeded generation result, the API result consumer creates asset metadata for each output:
 
 ```txt
-generation.result task.succeeded
+task.result task.succeeded
   -> GenerationResultConsumerService
   -> assets rows with task_id
 ```

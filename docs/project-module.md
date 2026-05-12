@@ -19,7 +19,7 @@ Rules:
 
 - `user_id + name` is unique.
 - `status` is `active` or `archived`.
-- `generation_tasks.project_id` is nullable for historical tasks and early smoke tests.
+- `tasks.project_id` is nullable for historical tasks and early smoke tests.
 - Deleting a project is not supported at this stage.
 
 ## API

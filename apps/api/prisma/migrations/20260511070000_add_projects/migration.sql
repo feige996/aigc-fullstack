@@ -13,8 +13,8 @@ CREATE TABLE `projects` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-CREATE INDEX `generation_tasks_project_id_created_at_idx` ON `generation_tasks`(`project_id`, `created_at`);
+CREATE INDEX `tasks_project_id_created_at_idx` ON `tasks`(`project_id`, `created_at`);
 
 ALTER TABLE `projects` ADD CONSTRAINT `projects_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `generation_tasks` ADD CONSTRAINT `generation_tasks_project_id_fkey` FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `tasks` ADD CONSTRAINT `tasks_project_id_fkey` FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;

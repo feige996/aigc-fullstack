@@ -1,9 +1,9 @@
-import type { CreateGenerationTaskDto } from './dto/create-generation-task.dto'
+import type { CreateTaskDto } from './dto/create-generation-task.dto'
 import type { AuthenticatedUser } from '../auth/auth.types'
 
 export interface CreateTaskInput {
   userId: string
-  dto: CreateGenerationTaskDto
+  dto: CreateTaskDto
 }
 
 export interface UserScopedInput {
@@ -30,7 +30,7 @@ export interface GenerationRequestPayload {
   referenceAssetIds: string[]
 }
 
-export interface GenerationTaskRecord {
+export interface TaskRecord {
   id: string
   userId: string
   projectId: string | null
@@ -42,16 +42,18 @@ export interface GenerationTaskRecord {
   billingStatus: string
   currentAttemptId: string | null
   maxAttempts: number
-  requestPayload: unknown
+  inputPayload: unknown
+  resultPayload: unknown | null
+  usagePayload: unknown | null
   createdAt: Date
   updatedAt: Date
   completedAt: Date | null
   currentAttempt?: unknown
   attempts?: unknown[]
-  assets?: GenerationTaskAssetRecord[]
+  assets?: TaskAssetRecord[]
 }
 
-export interface GenerationTaskAssetRecord {
+export interface TaskAssetRecord {
   id: string
   userId: string
   projectId: string | null
@@ -76,7 +78,7 @@ export interface GenerationTaskAssetRecord {
 export interface PublishAttemptInput {
   userId: string
   taskId: string
-  requestPayload: GenerationRequestPayload
+  inputPayload: GenerationRequestPayload
   attempt?: {
     id: string
     attemptNo: number

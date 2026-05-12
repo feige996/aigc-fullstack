@@ -61,7 +61,7 @@ retryable
 provider
 providerTaskId
 idempotencyKey
-requestPayloadHash
+inputPayloadHash
 startedAt
 endedAt
 errorMessage
@@ -161,7 +161,7 @@ attempt_2 retrying/running
 
 ## 请求哈希
 
-建议保存 `requestPayloadHash`，用于排查和幂等判断。
+建议保存 `inputPayloadHash`，用于排查和幂等判断。
 
 哈希内容应包含：
 

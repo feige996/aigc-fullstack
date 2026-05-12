@@ -191,7 +191,7 @@ Important queues:
 
 ```txt
 image.generate.queue
-generation.result.persist.queue
+task.result.persist.queue
 ```
 
 During normal idle state, both queues should usually have `0` messages. If the AI worker is not running, `image.generate.queue` may accumulate messages.

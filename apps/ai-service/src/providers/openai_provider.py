@@ -1,16 +1,16 @@
 from ..config import settings
-from ..contracts import GenerationRequestMessage
-from .base import GenerationProvider, ProviderError, ProviderResult
+from ..contracts import TaskRequestMessage
+from .base import ProviderError, ProviderResult, TaskProvider
 
 
-class OpenAIProvider(GenerationProvider):
+class OpenAIProvider(TaskProvider):
     name = "openai"
 
     @property
     def enabled(self) -> bool:
         return bool(settings.openai_api_key)
 
-    async def generate(self, task: GenerationRequestMessage) -> ProviderResult:
+    async def generate(self, task: TaskRequestMessage) -> ProviderResult:
         if not self.enabled:
             raise ProviderError(
                 code="PROVIDER_NOT_CONFIGURED",

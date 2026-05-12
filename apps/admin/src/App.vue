@@ -10,7 +10,7 @@ import type {
   AdminUser,
   AuthResponse,
   Asset,
-  GenerationTask,
+  Task,
   Project,
   StoredAuth,
   TaskStatus,
@@ -29,8 +29,8 @@ const accessToken = ref(storedAuth.accessToken)
 const refreshToken = ref(storedAuth.refreshToken)
 const currentUser = ref<AuthResponse['user'] | null>(null)
 const activeView = ref<ActiveView>('tasks')
-const tasks = ref<GenerationTask[]>([])
-const selectedTask = ref<GenerationTask | null>(null)
+const tasks = ref<Task[]>([])
+const selectedTask = ref<Task | null>(null)
 const users = ref<AdminUser[]>([])
 const projects = ref<Project[]>([])
 const isLoading = ref(false)
@@ -291,7 +291,7 @@ async function loadTasks() {
       throw new Error(`Load tasks failed: ${response.status}`)
     }
 
-    const result = (await response.json()) as { items: GenerationTask[] }
+    const result = (await response.json()) as { items: Task[] }
     tasks.value = result.items
 
     if (!selectedTask.value && result.items[0]) {
@@ -404,7 +404,7 @@ async function updateUser(userId: string, path: string, body: Record<string, str
   }
 }
 
-async function selectTask(task: GenerationTask) {
+async function selectTask(task: Task) {
   const response = await apiFetch(`/generation/tasks/${task.taskId}`)
 
   if (!response.ok) {
@@ -412,7 +412,7 @@ async function selectTask(task: GenerationTask) {
     return
   }
 
-  selectedTask.value = (await response.json()) as GenerationTask
+  selectedTask.value = (await response.json()) as Task
 }
 
 async function retrySelectedTask() {
@@ -531,11 +531,11 @@ async function downloadAsset(asset: Asset) {
   }
 }
 
-function canRetry(task: GenerationTask | null) {
+function canRetry(task: Task | null) {
   return Boolean(task && task.status !== 'succeeded' && task.status !== 'running' && task.status !== 'retrying')
 }
 
-function canCancel(task: GenerationTask | null) {
+function canCancel(task: Task | null) {
   return Boolean(
     task &&
       task.status !== 'succeeded' &&

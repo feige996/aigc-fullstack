@@ -178,7 +178,7 @@ apps/web/src/features/aigc-generation/
 
 ```txt
 apps/admin/src/features/aigc-generation/
-  AdminGenerationTasks.vue
+  AdminTasks.vue
   generation-admin-api.ts
   feature.manifest.ts
 ```
@@ -223,7 +223,7 @@ apps/ai-service/src/features/image-generation/
 当前不做：
 
 - 不移动目录。
-- 不重命名 `GenerationTask` 数据库表。
+- 数据库表已经统一为 `tasks` / `task_attempts`，`/api/generation/*` 仅作为 AIGC feature 入口保留。
 - 不新增通用 `tasks` 表。
 - 不生成动态路由。
 - 不改变 API 路径。

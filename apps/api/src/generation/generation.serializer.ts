@@ -3,11 +3,11 @@ import { createHash } from 'node:crypto'
 import type { AuthenticatedUser } from '../auth/auth.types'
 import type {
   GenerationRequestPayload,
-  GenerationTaskAssetRecord,
-  GenerationTaskRecord
+  TaskAssetRecord,
+  TaskRecord
 } from './generation.types'
 
-export function serializeGenerationTask(task: GenerationTaskRecord) {
+export function serializeTask(task: TaskRecord) {
   return {
     taskId: task.id,
     userId: task.userId,
@@ -20,7 +20,9 @@ export function serializeGenerationTask(task: GenerationTaskRecord) {
     billingStatus: task.billingStatus,
     currentAttemptId: task.currentAttemptId,
     maxAttempts: task.maxAttempts,
-    requestPayload: task.requestPayload,
+    inputPayload: task.inputPayload,
+    resultPayload: task.resultPayload,
+    usagePayload: task.usagePayload,
     currentAttempt: task.currentAttempt,
     attempts: task.attempts,
     assets: task.assets?.map((asset) => serializeGenerationAsset(asset)),
@@ -30,7 +32,7 @@ export function serializeGenerationTask(task: GenerationTaskRecord) {
   }
 }
 
-function serializeGenerationAsset(asset: GenerationTaskAssetRecord) {
+function serializeGenerationAsset(asset: TaskAssetRecord) {
   return {
     assetId: asset.id,
     userId: asset.userId,
@@ -68,6 +70,6 @@ export function hashGenerationPayload(payload: GenerationRequestPayload) {
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex')
 }
 
-export function toPrismaJson(payload: GenerationRequestPayload): Prisma.InputJsonValue {
+export function toPrismaJson(payload: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(payload)) as Prisma.InputJsonValue
 }

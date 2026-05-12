@@ -143,7 +143,7 @@ export class AssetsService {
       return
     }
 
-    const task = await this.prisma.generationTask.findFirst({
+    const task = await this.prisma.task.findFirst({
       where: {
         id: taskId,
         userId

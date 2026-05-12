@@ -19,7 +19,7 @@ export class RabbitmqService implements OnModuleDestroy {
 
   async publishGenerationRequest(message: unknown) {
     await this.publishJson({
-      exchange: rabbitExchanges.generationRequest,
+      exchange: rabbitExchanges.taskRequest,
       routingKey: rabbitRoutingKeys.imageGenerate,
       message
     })
@@ -45,7 +45,7 @@ export class RabbitmqService implements OnModuleDestroy {
     await this.assertGenerationResultTopology(channel)
 
     await channel.consume(
-      rabbitQueues.generationResultPersist,
+      rabbitQueues.taskResultPersist,
       async (message) => {
         if (!message) {
           return
@@ -85,7 +85,7 @@ export class RabbitmqService implements OnModuleDestroy {
     this.connection = await amqp.connect(url)
     this.channel = await this.connection.createChannel()
 
-    await this.channel.assertExchange(rabbitExchanges.generationRequest, 'direct', {
+    await this.channel.assertExchange(rabbitExchanges.taskRequest, 'direct', {
       durable: true
     })
 
@@ -95,7 +95,7 @@ export class RabbitmqService implements OnModuleDestroy {
 
     await this.channel.bindQueue(
       rabbitQueues.imageGenerate,
-      rabbitExchanges.generationRequest,
+      rabbitExchanges.taskRequest,
       rabbitRoutingKeys.imageGenerate
     )
 
@@ -105,23 +105,23 @@ export class RabbitmqService implements OnModuleDestroy {
   }
 
   private async assertGenerationResultTopology(channel: amqp.Channel) {
-    await channel.assertExchange(rabbitExchanges.generationResult, 'direct', {
+    await channel.assertExchange(rabbitExchanges.taskResult, 'direct', {
       durable: true
     })
 
-    await channel.assertQueue(rabbitQueues.generationResultPersist, {
+    await channel.assertQueue(rabbitQueues.taskResultPersist, {
       durable: true
     })
 
     await channel.bindQueue(
-      rabbitQueues.generationResultPersist,
-      rabbitExchanges.generationResult,
+      rabbitQueues.taskResultPersist,
+      rabbitExchanges.taskResult,
       rabbitRoutingKeys.taskSucceeded
     )
 
     await channel.bindQueue(
-      rabbitQueues.generationResultPersist,
-      rabbitExchanges.generationResult,
+      rabbitQueues.taskResultPersist,
+      rabbitExchanges.taskResult,
       rabbitRoutingKeys.taskFailed
     )
   }

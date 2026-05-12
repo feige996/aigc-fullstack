@@ -4,9 +4,9 @@
 
 Task 是平台层的通用异步执行记录。它不应该绑定到 AIGC、小说、文档、合同等具体业务。
 
-当前仓库仍保留 `GenerationTask` 作为 AIGC 生成链路的实现，不在本阶段改数据库，也不强制改运行时消息。
+当前仓库已将平台层任务落地为通用 `Task` 和 `TaskAttempt`，AIGC 图片生成只是当前 feature 入口。
 
-本阶段只定义通用词汇：
+当前运行时消息和持久化模型统一使用：
 
 ```txt
 domain
@@ -132,17 +132,16 @@ contract_risk_analysis
 
 ## 当前落地范围
 
-当前只做：
+当前已落地：
 
-- 在 `shared-contracts` 中新增常量和类型。
-- 文档明确语义。
-
-当前不做：
-
-- 不改 `generation_tasks` 表。
-- 不新增通用 `tasks` 表。
-- 不强制修改 `GenerationRequestMessage`。
-- 不改现有浏览器验证链路。
+- Prisma 模型使用 `Task`、`TaskAttempt`。
+- 数据库表使用 `tasks`、`task_attempts`。
+- `stage` 是字符串，由 feature 或 workflow 自定义。
+- `inputPayload` 保存业务输入，`resultPayload` 保存结构化输出。
+- `billingStatus` 保留为用户侧额度、扣费、退款、释放状态。
+- `usagePayload` 记录模型 token、供应商成本、内部成本和资源消耗，不承担扣费状态职责。
+- RabbitMQ 使用 `task.request`、`task.result`、`task.dead-letter`，结果持久化队列为 `task.result.persist.queue`。
+- AIGC 图片 worker 使用 `image.generate.queue` 作为 capability/feature 队列。
 
 ## 后续触发条件
 

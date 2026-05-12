@@ -1,21 +1,21 @@
 from ..config import settings
-from ..contracts import GenerationRequestMessage
+from ..contracts import TaskRequestMessage
 from ..storage import ObjectStorage
-from .base import GenerationProvider, ProviderError, ProviderResult
+from .base import ProviderError, ProviderResult, TaskProvider
 from .mock_provider import MockProvider
 from .openai_provider import OpenAIProvider
 
 
 class ProviderRegistry:
-    def __init__(self, providers: list[GenerationProvider], default_provider_name: str) -> None:
+    def __init__(self, providers: list[TaskProvider], default_provider_name: str) -> None:
         self.providers = {provider.name: provider for provider in providers}
         self.default_provider_name = default_provider_name
 
-    async def generate(self, task: GenerationRequestMessage) -> ProviderResult:
+    async def generate(self, task: TaskRequestMessage) -> ProviderResult:
         provider = self.resolve(task.model)
         return await provider.generate(task)
 
-    def resolve(self, model: str) -> GenerationProvider:
+    def resolve(self, model: str) -> TaskProvider:
         provider_name = self.provider_name_from_model(model)
         provider = self.providers.get(provider_name)
 

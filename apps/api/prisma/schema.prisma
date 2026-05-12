@@ -7,27 +7,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model GenerationTask {
-  id               String                   @id @default(cuid())
-  userId           String                   @map("user_id")
-  projectId        String?                  @map("project_id")
+model Task {
+  id               String        @id @default(cuid())
+  userId           String        @map("user_id")
+  projectId        String?       @map("project_id")
   type             String
   model            String
-  status           GenerationTaskStatus
-  stage            GenerationTaskStage
-  failureCode      FailureCode?             @map("failure_code")
-  billingStatus    BillingStatus            @map("billing_status")
-  currentAttemptId String?                  @unique @map("current_attempt_id")
-  maxAttempts      Int                      @default(3) @map("max_attempts")
-  requestPayload   Json                     @map("request_payload")
-  createdAt        DateTime                 @default(now()) @map("created_at")
-  updatedAt        DateTime                 @updatedAt @map("updated_at")
-  completedAt      DateTime?                @map("completed_at")
+  status           TaskStatus
+  stage            String
+  failureCode      FailureCode?  @map("failure_code")
+  billingStatus    BillingStatus @default(none) @map("billing_status")
+  currentAttemptId String?       @unique @map("current_attempt_id")
+  maxAttempts      Int           @default(3) @map("max_attempts")
+  inputPayload     Json          @map("input_payload")
+  resultPayload    Json?         @map("result_payload")
+  usagePayload     Json?         @map("usage_payload")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  completedAt      DateTime?     @map("completed_at")
 
-  attempts       GenerationTaskAttempt[]    @relation("TaskAttempts")
-  currentAttempt GenerationTaskAttempt?     @relation("CurrentAttempt", fields: [currentAttemptId], references: [id])
-  user           User                       @relation(fields: [userId], references: [id])
-  project        Project?                   @relation(fields: [projectId], references: [id])
+  attempts       TaskAttempt[] @relation("TaskAttempts")
+  currentAttempt TaskAttempt?  @relation("CurrentAttempt", fields: [currentAttemptId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+  project        Project?      @relation(fields: [projectId], references: [id])
   assets         Asset[]
 
   @@index([userId, createdAt])
@@ -35,23 +37,23 @@ model GenerationTask {
   @@index([status, createdAt])
   @@index([model, createdAt])
   @@index([failureCode, createdAt])
-  @@map("generation_tasks")
+  @@map("tasks")
 }
 
 model User {
-  id               String        @id @default(cuid())
-  phoneNumber      String        @map("phone_number")
-  passwordHash     String        @map("password_hash")
-  displayName      String?       @map("display_name")
-  role             UserRole      @default(user)
-  status           UserStatus    @default(active)
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  id           String     @id @default(cuid())
+  phoneNumber  String     @map("phone_number")
+  passwordHash String     @map("password_hash")
+  displayName  String?    @map("display_name")
+  role         UserRole   @default(user)
+  status       UserStatus @default(active)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  generationTasks GenerationTask[]
-  refreshTokens   RefreshToken[]
-  projects        Project[]
-  assets          Asset[]
+  tasks         Task[]
+  refreshTokens RefreshToken[]
+  projects      Project[]
+  assets        Asset[]
 
   @@unique([phoneNumber])
   @@index([role, createdAt])
@@ -60,17 +62,17 @@ model User {
 }
 
 model Project {
-  id              String        @id @default(cuid())
-  userId          String        @map("user_id")
-  name            String
-  description     String?
-  status          ProjectStatus @default(active)
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id          String        @id @default(cuid())
+  userId      String        @map("user_id")
+  name        String
+  description String?
+  status      ProjectStatus @default(active)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
 
-  user            User             @relation(fields: [userId], references: [id])
-  generationTasks GenerationTask[]
-  assets          Asset[]
+  user   User    @relation(fields: [userId], references: [id])
+  tasks  Task[]
+  assets Asset[]
 
   @@unique([userId, name])
   @@index([userId, createdAt])
@@ -79,29 +81,29 @@ model Project {
 }
 
 model Asset {
-  id          String       @id @default(cuid())
-  userId      String       @map("user_id")
-  projectId   String?      @map("project_id")
-  taskId      String?      @map("task_id")
-  type        AssetType
-  status      AssetStatus  @default(temporary)
-  provider    String
-  bucket      String
-  objectKey   String       @map("object_key")
-  mimeType    String       @map("mime_type")
-  size        Int?
-  checksum    String?
-  width       Int?
-  height      Int?
-  duration    Int?
-  expiresAt   DateTime?    @map("expires_at")
-  deletedAt   DateTime?    @map("deleted_at")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  id        String      @id @default(cuid())
+  userId    String      @map("user_id")
+  projectId String?     @map("project_id")
+  taskId    String?     @map("task_id")
+  type      AssetType
+  status    AssetStatus @default(temporary)
+  provider  String
+  bucket    String
+  objectKey String      @map("object_key")
+  mimeType  String      @map("mime_type")
+  size      Int?
+  checksum  String?
+  width     Int?
+  height    Int?
+  duration  Int?
+  expiresAt DateTime?   @map("expires_at")
+  deletedAt DateTime?   @map("deleted_at")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
 
-  user        User            @relation(fields: [userId], references: [id])
-  project     Project?        @relation(fields: [projectId], references: [id])
-  task        GenerationTask? @relation(fields: [taskId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+  task    Task?    @relation(fields: [taskId], references: [id])
 
   @@unique([bucket, objectKey])
   @@index([userId, createdAt])
@@ -126,35 +128,35 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-model GenerationTaskAttempt {
-  id                 String               @id @default(cuid())
-  taskId             String               @map("task_id")
-  attemptNo          Int                  @map("attempt_no")
-  status             AttemptStatus
-  stage              GenerationTaskStage
-  provider           String?
-  providerTaskId     String?              @map("provider_task_id")
-  failureCode        FailureCode?         @map("failure_code")
-  retryable          Boolean              @default(true)
-  idempotencyKey     String               @unique @map("idempotency_key")
-  requestPayloadHash String               @map("request_payload_hash")
-  rawError           Json?                @map("raw_error")
-  startedAt          DateTime?            @map("started_at")
-  endedAt            DateTime?            @map("ended_at")
-  createdAt          DateTime             @default(now()) @map("created_at")
-  updatedAt          DateTime             @updatedAt @map("updated_at")
+model TaskAttempt {
+  id               String        @id @default(cuid())
+  taskId           String        @map("task_id")
+  attemptNo        Int           @map("attempt_no")
+  status           AttemptStatus
+  stage            String
+  provider         String?
+  providerTaskId   String?       @map("provider_task_id")
+  failureCode      FailureCode?  @map("failure_code")
+  retryable        Boolean       @default(true)
+  idempotencyKey   String        @unique @map("idempotency_key")
+  inputPayloadHash String        @map("input_payload_hash")
+  rawError         Json?         @map("raw_error")
+  startedAt        DateTime?     @map("started_at")
+  endedAt          DateTime?     @map("ended_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
 
-  task          GenerationTask  @relation("TaskAttempts", fields: [taskId], references: [id])
-  currentForTask GenerationTask? @relation("CurrentAttempt")
+  task           Task  @relation("TaskAttempts", fields: [taskId], references: [id])
+  currentForTask Task? @relation("CurrentAttempt")
 
   @@unique([taskId, attemptNo])
   @@index([taskId, status])
   @@index([provider, providerTaskId])
   @@index([failureCode, createdAt])
-  @@map("generation_task_attempts")
+  @@map("task_attempts")
 }
 
-enum GenerationTaskStatus {
+enum TaskStatus {
   draft
   validating
   rejected
@@ -215,24 +217,6 @@ enum AssetStatus {
   deleted
   expired
   orphaned
-}
-
-enum GenerationTaskStage {
-  input_validation
-  text_moderation
-  asset_moderation
-  quota_check
-  billing_freeze
-  queue_publish
-  model_dispatch
-  model_waiting
-  model_generating
-  result_fetching
-  media_processing
-  result_moderation
-  asset_uploading
-  billing_confirm
-  completed
 }
 
 enum BillingStatus {

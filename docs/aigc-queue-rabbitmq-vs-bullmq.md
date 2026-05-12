@@ -87,9 +87,9 @@ NestJS 消费结果并更新数据库
 Exchange：
 
 ```txt
-generation.request
-generation.result
-generation.dead-letter
+task.request
+task.result
+task.dead-letter
 ```
 
 Queue：
@@ -99,8 +99,8 @@ image.generate.queue
 video.generate.queue
 image.upscale.queue
 image.inpaint.queue
-generation.result.persist.queue
-generation.failed.queue
+task.result.persist.queue
+task.failed.queue
 ```
 
 Routing key：
@@ -117,10 +117,10 @@ task.failed
 消息流：
 
 ```txt
-NestJS -> generation.request -> image.generate.queue -> FastAPI image worker
-NestJS -> generation.request -> video.generate.queue -> FastAPI video worker
-FastAPI -> generation.result -> generation.result.persist.queue -> NestJS
-失败消息 -> generation.dead-letter -> generation.failed.queue
+NestJS -> task.request -> image.generate.queue -> FastAPI image worker
+NestJS -> task.request -> video.generate.queue -> FastAPI video worker
+FastAPI -> task.result -> task.result.persist.queue -> NestJS
+失败消息 -> task.dead-letter -> task.failed.queue
 ```
 
 ## 数据一致性原则

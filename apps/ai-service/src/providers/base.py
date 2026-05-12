@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from ..contracts import GenerationRequestMessage, GenerationResultOutput, GenerationResultUsage
+from ..contracts import TaskRequestMessage, TaskResultOutput, TaskResultUsage
 
 
 @dataclass(frozen=True)
 class ProviderResult:
     provider: str
-    outputs: list[GenerationResultOutput]
-    usage: GenerationResultUsage | None = None
+    outputs: list[TaskResultOutput]
+    usage: TaskResultUsage | None = None
 
 
 @dataclass(frozen=True)
@@ -18,9 +18,9 @@ class ProviderError(Exception):
     retryable: bool = True
 
 
-class GenerationProvider(ABC):
+class TaskProvider(ABC):
     name: str
 
     @abstractmethod
-    async def generate(self, task: GenerationRequestMessage) -> ProviderResult:
+    async def generate(self, task: TaskRequestMessage) -> ProviderResult:
         raise NotImplementedError

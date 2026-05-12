@@ -4,7 +4,7 @@ import { CurrentUser } from '../auth/current-user.decorator'
 import { Public } from '../auth/public.decorator'
 import { Roles } from '../auth/roles.decorator'
 import type { AuthenticatedUser } from '../auth/auth.types'
-import { CreateGenerationTaskDto } from './dto/create-generation-task.dto'
+import { CreateTaskDto } from './dto/create-generation-task.dto'
 import { GenerationEventsService } from './generation-events.service'
 import { GenerationService } from './generation.service'
 
@@ -16,7 +16,7 @@ export class GenerationController {
   ) {}
 
   @Post()
-  createTask(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateGenerationTaskDto) {
+  createTask(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateTaskDto) {
     return this.generationService.createTask({
       userId: user.id,
       dto

@@ -340,17 +340,17 @@ FastAPI 回调 NestJS 时，应返回标准化结果：
 推荐消息流：
 
 ```txt
-generation.request exchange
+task.request exchange
   -> image.generate queue
   -> video.generate queue
   -> image.upscale queue
   -> image.inpaint queue
 
-generation.result exchange
-  -> generation.result.persist queue
+task.result exchange
+  -> task.result.persist queue
 
-generation.dead-letter exchange
-  -> generation.failed queue
+task.dead-letter exchange
+  -> task.failed queue
 ```
 
 RabbitMQ 与 BullMQ 的详细对比见：[AIGC 队列选型：RabbitMQ 与 BullMQ](./aigc-queue-rabbitmq-vs-bullmq.md)。
@@ -405,7 +405,7 @@ retry：重试信息，用于判断是否可自动重试或手动重试
 推荐字段：
 
 ```ts
-type GenerationTaskStatus =
+type TaskStatus =
   | 'draft'
   | 'validating'
   | 'rejected'
@@ -419,7 +419,7 @@ type GenerationTaskStatus =
   | 'canceled'
   | 'expired'
 
-type GenerationTaskStage =
+type TaskStage = string
   | 'input_validation'
   | 'text_moderation'
   | 'asset_moderation'

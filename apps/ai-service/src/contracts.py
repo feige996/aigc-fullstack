@@ -1,26 +1,28 @@
 from pydantic import BaseModel, Field
 
 
-class GenerationInput(BaseModel):
+class TaskInput(BaseModel):
     prompt: str
     ratio: str | None = None
     duration: int | None = None
     reference_asset_ids: list[str] = Field(default_factory=list, alias="referenceAssetIds")
 
 
-class GenerationRequestMessage(BaseModel):
+class TaskRequestMessage(BaseModel):
     trace_id: str = Field(alias="traceId")
     task_id: str = Field(alias="taskId")
     attempt_id: str = Field(alias="attemptId")
     user_id: str = Field(alias="userId")
+    domain: str = "default"
     type: str
+    capability: str = "generic_execution"
     model: str
-    input: GenerationInput
+    input: TaskInput
     idempotency_key: str = Field(alias="idempotencyKey")
     attempt: int
 
 
-class GenerationExecutionState(BaseModel):
+class TaskExecutionState(BaseModel):
     executable: bool
     reason: str | None = None
     task_status: str | None = Field(default=None, alias="taskStatus")
@@ -28,7 +30,7 @@ class GenerationExecutionState(BaseModel):
     current_attempt_id: str | None = Field(default=None, alias="currentAttemptId")
 
 
-class GenerationResultOutput(BaseModel):
+class TaskResultOutput(BaseModel):
     type: str
     object_path: str = Field(alias="objectPath")
     preview_url: str | None = Field(default=None, alias="previewUrl")
@@ -37,17 +39,17 @@ class GenerationResultOutput(BaseModel):
     duration: int | None = None
 
 
-class GenerationResultUsage(BaseModel):
+class TaskResultUsage(BaseModel):
     cost: int
     unit: str
 
 
-class GenerationResultMessage(BaseModel):
+class TaskResultMessage(BaseModel):
     trace_id: str = Field(alias="traceId")
     task_id: str = Field(alias="taskId")
     attempt_id: str = Field(alias="attemptId")
     status: str
     provider: str
-    outputs: list[GenerationResultOutput]
-    usage: GenerationResultUsage | None = None
+    outputs: list[TaskResultOutput]
+    usage: TaskResultUsage | None = None
     error: dict | None = None

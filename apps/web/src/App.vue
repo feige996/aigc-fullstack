@@ -10,7 +10,7 @@ import type {
   AuthResponse,
   CreateAssetUploadResponse,
   CreateTaskResponse,
-  GenerationTask,
+  Task,
   Project,
   StoredAuth
 } from './types'
@@ -34,8 +34,8 @@ const selectedAssetIds = ref<string[]>([])
 const prompt = ref('a clean product photo of a ceramic cup')
 const ratio = ref('1:1')
 const activeTaskId = ref('')
-const activeTask = ref<GenerationTask | null>(null)
-const tasks = ref<GenerationTask[]>([])
+const activeTask = ref<Task | null>(null)
+const tasks = ref<Task[]>([])
 const isSubmitting = ref(false)
 const isCreatingProject = ref(false)
 const isUploadingAsset = ref(false)
@@ -432,7 +432,7 @@ async function refreshActiveTask() {
       throw new Error(`Fetch task failed: ${response.status}`)
     }
 
-    activeTask.value = (await response.json()) as GenerationTask
+    activeTask.value = (await response.json()) as Task
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Fetch task failed'
   } finally {
@@ -510,11 +510,11 @@ async function loadTasks() {
     return
   }
 
-  const result = (await response.json()) as { items: GenerationTask[] }
+  const result = (await response.json()) as { items: Task[] }
   tasks.value = result.items
 }
 
-function selectTask(task: GenerationTask) {
+function selectTask(task: Task) {
   activeTaskId.value = task.taskId
   activeTask.value = task
 }

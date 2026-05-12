@@ -19,7 +19,7 @@ ImageGenerateWorker
   -> ProviderRegistry
   -> MockProvider
   -> result_messages
-  -> RabbitMQ generation.result
+  -> RabbitMQ task.result
 ```
 
 当前代码位置：
@@ -36,7 +36,7 @@ apps/ai-service/src/storage.py
 
 - `worker_main.py` 是 Worker 进程入口，只负责连接 RabbitMQ 和启动具体 Worker。
 - `image_generate_worker.py` 负责消费图片生成队列、校验 attempt 是否仍可执行、调用 Provider Registry，并发布结果。
-- `result_messages.py` 负责把 provider 成功/失败结果转换为统一 `GenerationResultMessage` 和 RabbitMQ routing key。
+- `result_messages.py` 负责把 provider 成功/失败结果转换为统一 `TaskResultMessage` 和 RabbitMQ routing key。
 - `providers/registry.py` 负责根据 `model` 解析 provider。
 - `providers/base.py` 定义 provider adapter 接口、成功结果和统一错误。
 - `providers/mock_provider.py` 是当前 mock adapter。
@@ -83,7 +83,7 @@ openai:gpt-image-1
 class GenerationProvider:
     name: str
 
-    async def generate(self, task: GenerationRequestMessage) -> ProviderResult:
+    async def generate(self, task: TaskRequestMessage) -> ProviderResult:
         ...
 ```
 

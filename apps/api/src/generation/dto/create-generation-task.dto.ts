@@ -1,6 +1,6 @@
 import { IsArray, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator'
 
-export class CreateGenerationTaskDto {
+export class CreateTaskDto {
   @IsOptional()
   @IsString()
   clientRequestId?: string

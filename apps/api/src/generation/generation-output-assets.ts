@@ -1,5 +1,5 @@
 import type { AssetType, Prisma } from '@prisma/client'
-import type { GenerationResultMessage } from '@aigc/shared-contracts'
+import type { TaskResultMessage } from '@aigc/shared-contracts'
 
 interface TaskForOutputAssets {
   id: string
@@ -17,7 +17,7 @@ export function buildOutputAssetCreates({
   message
 }: {
   task: TaskForOutputAssets
-  message: GenerationResultMessage
+  message: TaskResultMessage
 }): Prisma.AssetCreateManyInput[] {
   return message.outputs.map((output) => ({
     userId: task.userId,

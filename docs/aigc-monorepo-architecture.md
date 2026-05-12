@@ -217,8 +217,8 @@ Prisma + MySQL
 ```txt
 users
 projects
-generation_tasks
-generation_task_attempts
+tasks
+task_attempts
 assets
 billing_transactions
 moderation_records
@@ -226,7 +226,7 @@ audit_logs
 provider_task_logs
 ```
 
-### generation_tasks
+### tasks
 
 任务主表，面向用户和业务状态。
 
@@ -244,13 +244,15 @@ failure_code
 billing_status
 current_attempt_id
 max_attempts
-request_payload
+input_payload
+result_payload
+usage_payload
 created_at
 updated_at
 completed_at
 ```
 
-### generation_task_attempts
+### task_attempts
 
 任务执行轮次表，面向执行、重试和排障。
 
@@ -267,7 +269,7 @@ provider_task_id
 failure_code
 retryable
 idempotency_key
-request_payload_hash
+input_payload_hash
 raw_error
 started_at
 ended_at
@@ -464,7 +466,7 @@ SSE_TICKET_SECRET
 
 ```txt
 1. web 提交生成任务到 api。
-2. api 校验参数、创建 generation_tasks 和 generation_task_attempts。
+2. api 校验参数、创建 tasks 和 task_attempts。
 3. api 冻结额度。
 4. api 发布 RabbitMQ 任务。
 5. ai-service 消费任务并返回 mock 结果。

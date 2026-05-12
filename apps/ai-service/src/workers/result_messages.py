@@ -1,19 +1,19 @@
 from dataclasses import dataclass
 
-from ..contracts import GenerationRequestMessage, GenerationResultMessage
+from ..contracts import TaskRequestMessage, TaskResultMessage
 from ..providers.base import ProviderError, ProviderResult
 from ..rabbitmq import TASK_FAILED_ROUTING_KEY, TASK_SUCCEEDED_ROUTING_KEY
 
 
 @dataclass(frozen=True)
 class WorkerResult:
-    message: GenerationResultMessage
+    message: TaskResultMessage
     routing_key: str
 
 
-def build_success_result(task: GenerationRequestMessage, provider_result: ProviderResult) -> WorkerResult:
+def build_success_result(task: TaskRequestMessage, provider_result: ProviderResult) -> WorkerResult:
     return WorkerResult(
-        message=GenerationResultMessage(
+        message=TaskResultMessage(
             traceId=task.trace_id,
             taskId=task.task_id,
             attemptId=task.attempt_id,
@@ -27,9 +27,9 @@ def build_success_result(task: GenerationRequestMessage, provider_result: Provid
     )
 
 
-def build_failed_result(task: GenerationRequestMessage, error: ProviderError) -> WorkerResult:
+def build_failed_result(task: TaskRequestMessage, error: ProviderError) -> WorkerResult:
     return WorkerResult(
-        message=GenerationResultMessage(
+        message=TaskResultMessage(
             traceId=task.trace_id,
             taskId=task.task_id,
             attemptId=task.attempt_id,

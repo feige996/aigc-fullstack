@@ -1,4 +1,4 @@
-export const generationTaskStatuses = [
+export const taskStatuses = [
   'draft',
   'validating',
   'rejected',
@@ -13,27 +13,9 @@ export const generationTaskStatuses = [
   'expired',
 ] as const;
 
-export type GenerationTaskStatus = (typeof generationTaskStatuses)[number];
+export type TaskStatus = (typeof taskStatuses)[number];
 
-export const generationTaskStages = [
-  'input_validation',
-  'text_moderation',
-  'asset_moderation',
-  'quota_check',
-  'billing_freeze',
-  'queue_publish',
-  'model_dispatch',
-  'model_waiting',
-  'model_generating',
-  'result_fetching',
-  'media_processing',
-  'result_moderation',
-  'asset_uploading',
-  'billing_confirm',
-  'completed',
-] as const;
-
-export type GenerationTaskStage = (typeof generationTaskStages)[number];
+export type TaskStage = string;
 
 export const billingStatuses = [
   'none',
@@ -168,9 +150,9 @@ export interface FeatureManifest {
 }
 
 export const rabbitExchanges = {
-  generationRequest: 'generation.request',
-  generationResult: 'generation.result',
-  generationDeadLetter: 'generation.dead-letter',
+  taskRequest: 'task.request',
+  taskResult: 'task.result',
+  taskDeadLetter: 'task.dead-letter',
 } as const;
 
 export const rabbitRoutingKeys = {
@@ -188,16 +170,18 @@ export const rabbitQueues = {
   videoGenerate: 'video.generate.queue',
   imageUpscale: 'image.upscale.queue',
   imageInpaint: 'image.inpaint.queue',
-  generationResultPersist: 'generation.result.persist.queue',
-  generationFailed: 'generation.failed.queue',
+  taskResultPersist: 'task.result.persist.queue',
+  taskFailed: 'task.failed.queue',
 } as const;
 
-export interface GenerationRequestMessage {
+export interface TaskRequestMessage {
   traceId: string;
   taskId: string;
   attemptId: string;
   userId: string;
+  domain: string;
   type: string;
+  capability: string;
   model: string;
   input: {
     prompt: string;
@@ -209,7 +193,7 @@ export interface GenerationRequestMessage {
   attempt: number;
 }
 
-export interface GenerationResultMessage {
+export interface TaskResultMessage {
   traceId: string;
   taskId: string;
   attemptId: string;

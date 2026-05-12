@@ -53,7 +53,7 @@ export class ProjectsService {
         },
         _count: {
           select: {
-            generationTasks: true
+            tasks: true
           }
         }
       }
@@ -80,7 +80,7 @@ export class ProjectsService {
         },
         _count: {
           select: {
-            generationTasks: true
+            tasks: true
           }
         }
       }
@@ -117,7 +117,7 @@ export class ProjectsService {
       displayName: string | null
     }
     _count?: {
-      generationTasks: number
+      tasks: number
     }
   }) {
     return {
@@ -126,7 +126,7 @@ export class ProjectsService {
       name: project.name,
       description: project.description,
       status: project.status,
-      taskCount: project._count?.generationTasks,
+      taskCount: project._count?.tasks,
       user: project.user,
       createdAt: project.createdAt.toISOString(),
       updatedAt: project.updatedAt.toISOString()

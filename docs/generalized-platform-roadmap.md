@@ -51,18 +51,16 @@ Feature Modules
 
 ## 当前偏 Feature 的模块
 
-以下模块仍偏 AIGC 生成场景，未来应迁移到 feature module：
+以下模块仍偏 AIGC 生成场景，未来应迁移到 feature module 或继续收敛到 capability 语义：
 
-- `GenerationTask`
-- `GenerationTaskAttempt`
-- `GenerationTaskStage`
+- `apps/api/src/generation/*` AIGC feature 编排
 - `BillingStatus`
 - `FailureCode` 中部分 provider/媒体处理错误
 - `apps/ai-service/src/workers/image_generate_worker.py`
 - Web 中的 prompt、ratio、reference assets 任务创建表单
 - Admin 中的 Generation Tasks 运营视图
 
-短期不要一次性重命名所有表和类。推荐先通过新增通用概念逐步替换。
+平台层任务表和消息契约已经完成通用命名，后续重点是把 AIGC feature 目录逐步从 `generation` 模块拆到 `features/aigc-generation`。
 
 ## 目标抽象
 
@@ -92,7 +90,7 @@ TaskAttempt
   providerTaskId
   status
   stage
-  requestPayloadHash
+  inputPayloadHash
   rawError
 ```
 
@@ -105,7 +103,7 @@ TaskAttempt
 
 ## 小说智选示例模块
 
-小说智选不应直接复用 `GenerationTask` 的语义，而应该在通用 Task 之上建业务概念：
+小说智选不应直接复用 `Task` 的语义，而应该在通用 Task 之上建业务概念：
 
 ```txt
 NovelWork
@@ -148,25 +146,20 @@ Task
 
 ### 阶段 1：文档和命名边界
 
-- 保留当前 `GenerationTask` 表。
-- 文档中明确 `GenerationTask` 是当前 AIGC 业务任务实现。
+- 平台层使用 `Task` / `TaskAttempt`。
+- 文档中明确 AIGC 只是当前 feature，任务表不再使用 AIGC 专有命名。
 - 新增通用任务设计文档。
 - Provider Registry 继续保持通用，不绑定图片生成。
 
 ### 阶段 2：代码中引入通用 Task 语言
 
 - 新增 `TaskDomain`、`TaskType` 约定。
-- 给现有 generation task 的 request payload 增加 domain 语义。
+- 运行时消息使用 `domain`、`type`、`capability`。
 - AI Service Worker 逐步从 `image_generate_worker` 迁移到 capability worker。
 
 ### 阶段 3：数据库重构
 
-可选路径：
-
-1. 保留 `generation_tasks`，新增 `analysis_tasks`。
-2. 新增通用 `tasks` 表，迁移 `generation_tasks`。
-
-推荐先走路径 1，等业务稳定后再考虑统一表。
+已完成早期迁移重写：新库从一开始创建 `tasks` 和 `task_attempts`。后续新增业务模块应复用通用任务表，在 feature 自己的业务表中通过 `taskId` 建关联。
 
 ### 阶段 4：Platform / Feature 目录边界
 
