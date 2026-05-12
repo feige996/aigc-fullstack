@@ -1,99 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-
-type TaskStatus =
-  | 'draft'
-  | 'validating'
-  | 'rejected'
-  | 'pending'
-  | 'queued'
-  | 'running'
-  | 'retrying'
-  | 'succeeded'
-  | 'failed'
-  | 'final_failed'
-  | 'canceled'
-  | 'expired'
-
-type UserRole = 'user' | 'admin' | 'super_admin'
-type UserStatus = 'active' | 'disabled'
-type ActiveView = 'tasks' | 'users' | 'projects'
-
-interface GenerationAttempt {
-  id: string
-  attemptNo: number
-  status: string
-  stage: string
-  failureCode: string | null
-  idempotencyKey: string
-  createdAt: string
-  updatedAt: string
-  endedAt: string | null
-}
-
-interface GenerationTask {
-  taskId: string
-  userId: string
-  type: string
-  model: string
-  status: TaskStatus
-  stage: string
-  failureCode: string | null
-  billingStatus: string
-  currentAttemptId: string | null
-  requestPayload: {
-    prompt?: string
-    ratio?: string
-  }
-  currentAttempt?: GenerationAttempt
-  attempts?: GenerationAttempt[]
-  createdAt: string
-  updatedAt: string
-  completedAt: string | null
-}
-
-interface AuthResponse {
-  accessToken: string
-  refreshToken: string
-  tokenType: string
-  user: {
-    id: string
-    phoneNumber: string
-    role: string
-    status: string
-  }
-}
-
-interface StoredAuth {
-  accessToken: string
-  refreshToken: string
-}
-
-interface AdminUser {
-  id: string
-  phoneNumber: string
-  displayName: string | null
-  role: UserRole
-  status: UserStatus
-  createdAt: string
-  updatedAt: string
-}
-
-interface Project {
-  projectId: string
-  userId: string
-  name: string
-  description: string | null
-  status: string
-  taskCount?: number
-  user?: {
-    id: string
-    phoneNumber: string
-    displayName: string | null
-  }
-  createdAt: string
-  updatedAt: string
-}
+import TaskDashboard from './features/aigc-generation/TaskDashboard.vue'
+import AccountCard from './platform/AccountCard.vue'
+import AuthCard from './platform/AuthCard.vue'
+import ProjectManagement from './platform/ProjectManagement.vue'
+import UserManagement from './platform/UserManagement.vue'
+import type {
+  ActiveView,
+  AdminUser,
+  AuthResponse,
+  GenerationTask,
+  Project,
+  StoredAuth,
+  TaskStatus,
+  UserRole,
+  UserStatus
+} from './types'
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
@@ -677,213 +599,57 @@ onMounted(async () => {
           <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon class="alert" />
           <el-alert v-if="successMessage" :title="successMessage" type="success" show-icon class="alert" />
 
-          <el-card v-if="!isAuthenticated" shadow="never" class="auth-card">
-            <template #header>Sign In</template>
-            <el-form label-position="top">
-              <el-form-item label="Phone">
-                <el-input v-model="phoneNumber" />
-              </el-form-item>
-              <el-form-item label="Password">
-                <el-input v-model="password" type="password" show-password />
-              </el-form-item>
-              <el-form-item label="Display Name">
-                <el-input v-model="displayName" />
-              </el-form-item>
-              <div class="auth-actions">
-                <el-button type="primary" @click="authenticate('login')">Login</el-button>
-                <el-button @click="authenticate('register')">Register</el-button>
-              </div>
-            </el-form>
-          </el-card>
+          <AuthCard
+            v-if="!isAuthenticated"
+            v-model:phone-number="phoneNumber"
+            v-model:password="password"
+            v-model:display-name="displayName"
+            @login="authenticate('login')"
+            @register="authenticate('register')"
+          />
 
           <template v-else>
-          <el-card shadow="never" class="account-card">
-            <template #header>Account</template>
-            <el-form label-position="top" class="account-form">
-              <el-form-item label="Current Password">
-                <el-input v-model="currentPassword" type="password" show-password />
-              </el-form-item>
-              <el-form-item label="New Password">
-                <el-input v-model="newPassword" type="password" show-password />
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" :loading="isChangingPassword" @click="changePassword">
-                  Change Password
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </el-card>
+            <AccountCard
+              v-model:current-password="currentPassword"
+              v-model:new-password="newPassword"
+              :is-changing-password="isChangingPassword"
+              @change-password="changePassword"
+            />
 
-          <template v-if="activeView === 'tasks'">
-          <section class="metrics">
-            <div>
-              <span>Total</span>
-              <strong>{{ totalTasks }}</strong>
-            </div>
-            <div>
-              <span>Succeeded</span>
-              <strong>{{ succeededTasks }}</strong>
-            </div>
-            <div>
-              <span>Failed</span>
-              <strong>{{ failedTasks }}</strong>
-            </div>
-          </section>
+            <TaskDashboard
+              v-if="activeView === 'tasks'"
+              :tasks="tasks"
+              :selected-task="selectedTask"
+              :total-tasks="totalTasks"
+              :succeeded-tasks="succeededTasks"
+              :failed-tasks="failedTasks"
+              :is-loading="isLoading"
+              :is-retrying="isRetrying"
+              :is-canceling="isCanceling"
+              :can-retry="canRetry"
+              :can-cancel="canCancel"
+              :status-type="statusType"
+              @select-task="selectTask"
+              @retry-selected-task="retrySelectedTask"
+              @cancel-selected-task="cancelSelectedTask"
+            />
 
-          <section class="content">
-            <el-card shadow="never" class="table-card">
-              <template #header>Recent Tasks</template>
-              <el-table
-                v-loading="isLoading"
-                :data="tasks"
-                height="520"
-                highlight-current-row
-                @row-click="selectTask"
-              >
-                <el-table-column prop="taskId" label="Task ID" min-width="220" show-overflow-tooltip />
-                <el-table-column prop="model" label="Model" width="160" />
-                <el-table-column label="Status" width="140">
-                  <template #default="{ row }">
-                    <el-tag :type="statusType(row.status)" effect="plain">{{ row.status }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="stage" label="Stage" width="160" />
-                <el-table-column prop="failureCode" label="Failure" width="180" show-overflow-tooltip />
-                <el-table-column prop="updatedAt" label="Updated" width="220" />
-              </el-table>
-            </el-card>
+            <UserManagement
+              v-else-if="activeView === 'users'"
+              :users="users"
+              :current-user-id="currentUser?.id"
+              :is-loading-users="isLoadingUsers"
+              :is-super-admin="isSuperAdmin"
+              :updating-user-ids="updatingUserIds"
+              @update-user-role="updateUserRole"
+              @update-user-status="updateUserStatus"
+            />
 
-            <el-card shadow="never" class="detail-card">
-              <template #header>
-                <div class="detail-header">
-                  <span>Task Detail</span>
-                  <el-button
-                    type="warning"
-                    size="small"
-                    :disabled="!canRetry(selectedTask)"
-                    :loading="isRetrying"
-                    @click="retrySelectedTask"
-                  >
-                    Retry
-                  </el-button>
-                  <el-button
-                    type="danger"
-                    size="small"
-                    :disabled="!canCancel(selectedTask)"
-                    :loading="isCanceling"
-                    @click="cancelSelectedTask"
-                  >
-                    Cancel
-                  </el-button>
-                </div>
-              </template>
-              <el-empty v-if="!selectedTask" description="No task selected" />
-              <template v-else>
-                <el-descriptions :column="1" border>
-                  <el-descriptions-item label="Task ID">{{ selectedTask.taskId }}</el-descriptions-item>
-                  <el-descriptions-item label="User">{{ selectedTask.userId }}</el-descriptions-item>
-                  <el-descriptions-item label="Status">
-                    <el-tag :type="statusType(selectedTask.status)" effect="plain">
-                      {{ selectedTask.status }}
-                    </el-tag>
-                  </el-descriptions-item>
-                  <el-descriptions-item label="Stage">{{ selectedTask.stage }}</el-descriptions-item>
-                  <el-descriptions-item label="Billing">{{ selectedTask.billingStatus }}</el-descriptions-item>
-                  <el-descriptions-item label="Prompt">
-                    {{ selectedTask.requestPayload.prompt }}
-                  </el-descriptions-item>
-                </el-descriptions>
-
-                <h2>Attempts</h2>
-                <el-table :data="selectedTask.attempts ?? []" size="small" border>
-                  <el-table-column prop="attemptNo" label="#" width="56" />
-                  <el-table-column prop="status" label="Status" width="120" />
-                  <el-table-column prop="stage" label="Stage" width="150" />
-                  <el-table-column prop="failureCode" label="Failure" min-width="160" />
-                </el-table>
-              </template>
-            </el-card>
-          </section>
-          </template>
-
-          <template v-else-if="activeView === 'users'">
-          <el-card shadow="never" class="users-card">
-            <template #header>User Management</template>
-            <el-table v-loading="isLoadingUsers" :data="users" height="560">
-              <el-table-column prop="phoneNumber" label="Phone" width="150" />
-              <el-table-column prop="displayName" label="Name" min-width="150" show-overflow-tooltip />
-              <el-table-column label="Role" width="180">
-                <template #default="{ row }">
-                  <el-select
-                    :model-value="row.role"
-                    size="small"
-                    :disabled="!isSuperAdmin || updatingUserIds.has(row.id)"
-                    @change="(role: UserRole) => updateUserRole(row, role)"
-                  >
-                    <el-option label="User" value="user" />
-                    <el-option label="Admin" value="admin" />
-                    <el-option label="Super Admin" value="super_admin" />
-                  </el-select>
-                </template>
-              </el-table-column>
-              <el-table-column label="Status" width="140">
-                <template #default="{ row }">
-                  <el-tag :type="row.status === 'active' ? 'success' : 'danger'" effect="plain">
-                    {{ row.status }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="createdAt" label="Created" width="220" />
-              <el-table-column label="Actions" width="150" fixed="right">
-                <template #default="{ row }">
-                  <el-button
-                    v-if="row.status === 'active'"
-                    type="danger"
-                    size="small"
-                    :loading="updatingUserIds.has(row.id)"
-                    :disabled="row.id === currentUser?.id"
-                    @click="updateUserStatus(row, 'disabled')"
-                  >
-                    Disable
-                  </el-button>
-                  <el-button
-                    v-else
-                    type="success"
-                    size="small"
-                    :loading="updatingUserIds.has(row.id)"
-                    @click="updateUserStatus(row, 'active')"
-                  >
-                    Enable
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-card>
-          </template>
-
-          <template v-else-if="activeView === 'projects'">
-          <el-card shadow="never" class="projects-card">
-            <template #header>Project Management</template>
-            <el-table v-loading="isLoadingProjects" :data="projects" height="560">
-              <el-table-column prop="name" label="Name" min-width="180" show-overflow-tooltip />
-              <el-table-column prop="description" label="Description" min-width="220" show-overflow-tooltip />
-              <el-table-column label="Owner" width="160">
-                <template #default="{ row }">
-                  {{ row.user?.phoneNumber ?? row.userId }}
-                </template>
-              </el-table-column>
-              <el-table-column label="Status" width="120">
-                <template #default="{ row }">
-                  <el-tag :type="row.status === 'active' ? 'success' : 'info'" effect="plain">
-                    {{ row.status }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="taskCount" label="Tasks" width="90" />
-              <el-table-column prop="createdAt" label="Created" width="220" />
-            </el-table>
-          </el-card>
-          </template>
+            <ProjectManagement
+              v-else-if="activeView === 'projects'"
+              :projects="projects"
+              :is-loading-projects="isLoadingProjects"
+            />
           </template>
         </el-main>
       </el-container>
@@ -891,7 +657,7 @@ onMounted(async () => {
   </el-config-provider>
 </template>
 
-<style scoped>
+<style>
 .layout {
   min-height: 100vh;
   background: #f6f7f9;
