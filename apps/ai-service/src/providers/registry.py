@@ -3,6 +3,7 @@ from ..contracts import GenerationRequestMessage
 from ..storage import ObjectStorage
 from .base import GenerationProvider, ProviderError, ProviderResult
 from .mock_provider import MockProvider
+from .openai_provider import OpenAIProvider
 
 
 class ProviderRegistry:
@@ -41,6 +42,7 @@ def create_provider_registry() -> ProviderRegistry:
     return ProviderRegistry(
         providers=[
             MockProvider(object_storage),
+            OpenAIProvider(),
         ],
         default_provider_name=settings.model_provider,
     )
