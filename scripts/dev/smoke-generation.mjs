@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const apiBaseUrl = process.env.API_BASE_URL ?? 'http://localhost:3000/api'
-const phoneNumber = process.env.SMOKE_PHONE_NUMBER ?? '13800138000'
+const phoneNumber = process.env.SMOKE_PHONE_NUMBER ?? '13900139000'
 const password = process.env.SMOKE_PASSWORD ?? 'password123'
 const prompt = process.env.SMOKE_PROMPT ?? 'smoke test product photo'
 const timeoutMs = Number(process.env.SMOKE_TIMEOUT_MS ?? 30000)

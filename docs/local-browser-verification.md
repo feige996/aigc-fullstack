@@ -132,7 +132,7 @@ It requires:
 Default credentials:
 
 ```txt
-Phone: 13800138000
+Phone: 13900139000
 Password: password123
 ```
 
@@ -146,7 +146,7 @@ Use a different API URL or account:
 
 ```bash
 API_BASE_URL='http://localhost:3001/api' \
-SMOKE_PHONE_NUMBER='13800138000' \
+SMOKE_PHONE_NUMBER='13900139000' \
 SMOKE_PASSWORD='password123' \
 pnpm smoke:generation
 ```
@@ -162,7 +162,7 @@ SMOKE_INTERVAL_MS  Poll interval. Default: 1000
 Expected output shape:
 
 ```txt
-[smoke] authenticated user=13800138000 role=user
+[smoke] authenticated user=13900139000 role=super_admin
 [smoke] profile id=...
 [smoke] created task=... status=queued
 [smoke] poll task=... status=queued
@@ -201,7 +201,7 @@ List tasks:
 ```bash
 TOKEN=$(curl -sS -X POST http://localhost:3000/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"phoneNumber":"13800138000","password":"password123"}' \
+  -d '{"phoneNumber":"13900139000","password":"password123"}' \
   | node -pe 'JSON.parse(require("fs").readFileSync(0, "utf8")).accessToken')
 
 curl -sS http://localhost:3000/api/generation/tasks \
