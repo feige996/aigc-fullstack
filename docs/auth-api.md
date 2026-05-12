@@ -29,7 +29,7 @@ Login and registration return:
   "tokenType": "Bearer",
   "user": {
     "id": "...",
-    "phoneNumber": "13800138000",
+    "phoneNumber": "13900139000",
     "role": "user",
     "status": "active"
   }
@@ -53,7 +53,7 @@ Content-Type: application/json
 
 ```json
 {
-  "phoneNumber": "13800138000",
+  "phoneNumber": "13900139000",
   "password": "password123",
   "displayName": "Demo User"
 }
@@ -74,7 +74,7 @@ Content-Type: application/json
 
 ```json
 {
-  "phoneNumber": "13800138000",
+  "phoneNumber": "13900139000",
   "password": "password123"
 }
 ```
@@ -129,7 +129,7 @@ Response:
 ```json
 {
   "id": "...",
-  "phoneNumber": "13800138000",
+  "phoneNumber": "13900139000",
   "role": "user",
   "status": "active"
 }

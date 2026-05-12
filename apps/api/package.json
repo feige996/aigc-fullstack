@@ -8,6 +8,7 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "seed": "tsx prisma/seed.ts",
     "test": "echo \"No tests yet\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -40,6 +41,7 @@
     "@types/node": "^22.15.3",
     "@types/passport-jwt": "^4.0.1",
     "prisma": "^6.19.3",
+    "tsx": "^4.20.6",
     "typescript": "^5.8.3"
   }
 }

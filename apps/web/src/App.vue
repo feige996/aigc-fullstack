@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import GenerationWorkspace from './features/aigc-generation/GenerationWorkspace.vue'
-import AccountPanel from './platform/AccountPanel.vue'
-import AssetPanel from './platform/AssetPanel.vue'
-import AuthPanel from './platform/AuthPanel.vue'
-import ProjectPanel from './platform/ProjectPanel.vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import GenerationWorkspace from './features/aigc-generation/GenerationWorkspace.vue';
+import AccountPanel from './platform/AccountPanel.vue';
+import AssetPanel from './platform/AssetPanel.vue';
+import AuthPanel from './platform/AuthPanel.vue';
+import ProjectPanel from './platform/ProjectPanel.vue';
 import type {
   Asset,
   AuthResponse,
@@ -12,147 +12,147 @@ import type {
   CreateTaskResponse,
   Task,
   Project,
-  StoredAuth
-} from './types'
+  StoredAuth,
+} from './types';
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
 
-const authStorageKey = 'aigc.web.auth'
-const phoneNumber = ref('13800138000')
-const password = ref('password123')
-const displayName = ref('Demo User')
-const storedAuth = readStoredAuth()
-const accessToken = ref(storedAuth.accessToken)
-const refreshToken = ref(storedAuth.refreshToken)
-const currentUser = ref<AuthResponse['user'] | null>(null)
-const projects = ref<Project[]>([])
-const selectedProjectId = ref('')
-const projectName = ref('Default Project')
-const projectDescription = ref('')
-const assets = ref<Asset[]>([])
-const selectedAssetIds = ref<string[]>([])
-const prompt = ref('a clean product photo of a ceramic cup')
-const ratio = ref('1:1')
-const activeTaskId = ref('')
-const activeTask = ref<Task | null>(null)
-const tasks = ref<Task[]>([])
-const isSubmitting = ref(false)
-const isCreatingProject = ref(false)
-const isUploadingAsset = ref(false)
-const isRefreshing = ref(false)
-const isCanceling = ref(false)
-const isChangingPassword = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
-const currentPassword = ref('')
-const newPassword = ref('')
-const eventSourceStatus = ref<'connecting' | 'open' | 'closed'>('closed')
-let eventSource: EventSource | null = null
+const authStorageKey = 'aigc.web.auth';
+const phoneNumber = ref('13900139000');
+const password = ref('password123');
+const displayName = ref('Demo User');
+const storedAuth = readStoredAuth();
+const accessToken = ref(storedAuth.accessToken);
+const refreshToken = ref(storedAuth.refreshToken);
+const currentUser = ref<AuthResponse['user'] | null>(null);
+const projects = ref<Project[]>([]);
+const selectedProjectId = ref('');
+const projectName = ref('Default Project');
+const projectDescription = ref('');
+const assets = ref<Asset[]>([]);
+const selectedAssetIds = ref<string[]>([]);
+const prompt = ref('a clean product photo of a ceramic cup');
+const ratio = ref('1:1');
+const activeTaskId = ref('');
+const activeTask = ref<Task | null>(null);
+const tasks = ref<Task[]>([]);
+const isSubmitting = ref(false);
+const isCreatingProject = ref(false);
+const isUploadingAsset = ref(false);
+const isRefreshing = ref(false);
+const isCanceling = ref(false);
+const isChangingPassword = ref(false);
+const errorMessage = ref('');
+const successMessage = ref('');
+const currentPassword = ref('');
+const newPassword = ref('');
+const eventSourceStatus = ref<'connecting' | 'open' | 'closed'>('closed');
+let eventSource: EventSource | null = null;
 
-const activeTaskStatusLabel = computed(() => activeTask.value?.status ?? 'idle')
-const isAuthenticated = computed(() => Boolean(accessToken.value))
+const activeTaskStatusLabel = computed(() => activeTask.value?.status ?? 'idle');
+const isAuthenticated = computed(() => Boolean(accessToken.value));
 
 function readStoredAuth(): StoredAuth {
-  const rawValue = localStorage.getItem(authStorageKey)
+  const rawValue = localStorage.getItem(authStorageKey);
 
   if (!rawValue) {
     return {
       accessToken: '',
-      refreshToken: ''
-    }
+      refreshToken: '',
+    };
   }
 
   try {
-    const parsed = JSON.parse(rawValue) as Partial<StoredAuth>
+    const parsed = JSON.parse(rawValue) as Partial<StoredAuth>;
 
     return {
       accessToken: parsed.accessToken ?? '',
-      refreshToken: parsed.refreshToken ?? ''
-    }
+      refreshToken: parsed.refreshToken ?? '',
+    };
   } catch {
     return {
       accessToken: rawValue,
-      refreshToken: ''
-    }
+      refreshToken: '',
+    };
   }
 }
 
 function storeAuth(result: AuthResponse) {
-  accessToken.value = result.accessToken
-  refreshToken.value = result.refreshToken
-  currentUser.value = result.user
+  accessToken.value = result.accessToken;
+  refreshToken.value = result.refreshToken;
+  currentUser.value = result.user;
   localStorage.setItem(
     authStorageKey,
     JSON.stringify({
       accessToken: result.accessToken,
-      refreshToken: result.refreshToken
-    })
-  )
+      refreshToken: result.refreshToken,
+    }),
+  );
 }
 
 function authHeaders(): Record<string, string> {
   return accessToken.value
     ? {
-        Authorization: `Bearer ${accessToken.value}`
+        Authorization: `Bearer ${accessToken.value}`,
       }
-    : {}
+    : {};
 }
 
 async function authenticate(mode: 'login' | 'register') {
-  errorMessage.value = ''
-  successMessage.value = ''
+  errorMessage.value = '';
+  successMessage.value = '';
 
   try {
     const response = await fetch(`${apiBaseUrl}/auth/${mode}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         phoneNumber: phoneNumber.value,
         password: password.value,
-        displayName: displayName.value
-      })
-    })
+        displayName: displayName.value,
+      }),
+    });
 
     if (!response.ok) {
-      throw new Error(`${mode} failed: ${response.status}`)
+      throw new Error(`${mode} failed: ${response.status}`);
     }
 
-    const result = (await response.json()) as AuthResponse
-    storeAuth(result)
-    await loadProjects()
-    await loadAssets()
-    await loadTasks()
-    connectEvents()
+    const result = (await response.json()) as AuthResponse;
+    storeAuth(result);
+    await loadProjects();
+    await loadAssets();
+    await loadTasks();
+    connectEvents();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : `${mode} failed`
+    errorMessage.value = error instanceof Error ? error.message : `${mode} failed`;
   }
 }
 
 async function refreshAuth() {
   if (!refreshToken.value) {
-    return false
+    return false;
   }
 
   const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      refreshToken: refreshToken.value
-    })
-  })
+      refreshToken: refreshToken.value,
+    }),
+  });
 
   if (!response.ok) {
-    return false
+    return false;
   }
 
-  const result = (await response.json()) as AuthResponse
-  storeAuth(result)
-  connectEvents()
-  return true
+  const result = (await response.json()) as AuthResponse;
+  storeAuth(result);
+  connectEvents();
+  return true;
 }
 
 async function apiFetch(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
@@ -160,236 +160,236 @@ async function apiFetch(path: string, init: RequestInit = {}, retry = true): Pro
     ...init,
     headers: {
       ...authHeaders(),
-      ...(init.headers ?? {})
-    }
-  })
+      ...(init.headers ?? {}),
+    },
+  });
 
   if (response.status !== 401 || !retry) {
-    return response
+    return response;
   }
 
-  const refreshed = await refreshAuth()
+  const refreshed = await refreshAuth();
 
   if (!refreshed) {
-    await signOut(false)
-    return response
+    await signOut(false);
+    return response;
   }
 
-  return apiFetch(path, init, false)
+  return apiFetch(path, init, false);
 }
 
 async function loadProfile() {
   if (!accessToken.value) {
-    return
+    return;
   }
 
-  const response = await apiFetch('/auth/me')
+  const response = await apiFetch('/auth/me');
 
   if (!response.ok) {
-    await signOut(false)
-    return
+    await signOut(false);
+    return;
   }
 
-  currentUser.value = (await response.json()) as AuthResponse['user']
+  currentUser.value = (await response.json()) as AuthResponse['user'];
 }
 
 async function signOut(callServer = true) {
-  const tokenToRevoke = refreshToken.value
+  const tokenToRevoke = refreshToken.value;
 
   if (callServer && tokenToRevoke) {
     await fetch(`${apiBaseUrl}/auth/logout`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        refreshToken: tokenToRevoke
-      })
-    }).catch(() => undefined)
+        refreshToken: tokenToRevoke,
+      }),
+    }).catch(() => undefined);
   }
 
-  eventSource?.close()
-  eventSource = null
-  eventSourceStatus.value = 'closed'
-  accessToken.value = ''
-  refreshToken.value = ''
-  currentUser.value = null
-  activeTaskId.value = ''
-  activeTask.value = null
-  tasks.value = []
-  projects.value = []
-  selectedProjectId.value = ''
-  assets.value = []
-  selectedAssetIds.value = []
-  localStorage.removeItem(authStorageKey)
+  eventSource?.close();
+  eventSource = null;
+  eventSourceStatus.value = 'closed';
+  accessToken.value = '';
+  refreshToken.value = '';
+  currentUser.value = null;
+  activeTaskId.value = '';
+  activeTask.value = null;
+  tasks.value = [];
+  projects.value = [];
+  selectedProjectId.value = '';
+  assets.value = [];
+  selectedAssetIds.value = [];
+  localStorage.removeItem(authStorageKey);
 }
 
 async function loadProjects() {
   if (!accessToken.value) {
-    return
+    return;
   }
 
-  const response = await apiFetch('/projects')
+  const response = await apiFetch('/projects');
 
   if (!response.ok) {
-    return
+    return;
   }
 
-  const result = (await response.json()) as { items: Project[] }
-  projects.value = result.items
+  const result = (await response.json()) as { items: Project[] };
+  projects.value = result.items;
 
   if (!selectedProjectId.value && result.items[0]) {
-    selectedProjectId.value = result.items[0].projectId
+    selectedProjectId.value = result.items[0].projectId;
   }
 }
 
 async function createProject() {
-  errorMessage.value = ''
-  successMessage.value = ''
-  isCreatingProject.value = true
+  errorMessage.value = '';
+  successMessage.value = '';
+  isCreatingProject.value = true;
 
   try {
     const response = await apiFetch('/projects', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         name: projectName.value,
-        description: projectDescription.value
-      })
-    })
+        description: projectDescription.value,
+      }),
+    });
 
     if (!response.ok) {
-      throw new Error(`Create project failed: ${response.status}`)
+      throw new Error(`Create project failed: ${response.status}`);
     }
 
-    const project = (await response.json()) as Project
-    projects.value = [project, ...projects.value]
-    selectedProjectId.value = project.projectId
-    projectName.value = ''
-    projectDescription.value = ''
-    successMessage.value = 'Project created.'
+    const project = (await response.json()) as Project;
+    projects.value = [project, ...projects.value];
+    selectedProjectId.value = project.projectId;
+    projectName.value = '';
+    projectDescription.value = '';
+    successMessage.value = 'Project created.';
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Create project failed'
+    errorMessage.value = error instanceof Error ? error.message : 'Create project failed';
   } finally {
-    isCreatingProject.value = false
+    isCreatingProject.value = false;
   }
 }
 
 async function loadAssets() {
   if (!accessToken.value) {
-    return
+    return;
   }
 
-  const response = await apiFetch('/assets')
+  const response = await apiFetch('/assets');
 
   if (!response.ok) {
-    return
+    return;
   }
 
-  const result = (await response.json()) as { items: Asset[] }
-  assets.value = result.items
+  const result = (await response.json()) as { items: Asset[] };
+  assets.value = result.items;
 }
 
 async function uploadAsset(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
 
   if (!file) {
-    return
+    return;
   }
 
-  errorMessage.value = ''
-  successMessage.value = ''
-  isUploadingAsset.value = true
+  errorMessage.value = '';
+  successMessage.value = '';
+  isUploadingAsset.value = true;
 
   try {
     const createResponse = await apiFetch('/assets/uploads', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         type: 'user_upload',
         fileName: file.name,
         mimeType: file.type || 'application/octet-stream',
         size: file.size,
-        projectId: selectedProjectId.value || undefined
-      })
-    })
+        projectId: selectedProjectId.value || undefined,
+      }),
+    });
 
     if (!createResponse.ok) {
-      throw new Error(`Create upload failed: ${createResponse.status}`)
+      throw new Error(`Create upload failed: ${createResponse.status}`);
     }
 
-    const uploadInfo = (await createResponse.json()) as CreateAssetUploadResponse
+    const uploadInfo = (await createResponse.json()) as CreateAssetUploadResponse;
     const putResponse = await fetch(uploadInfo.upload.url, {
       method: uploadInfo.upload.method,
       headers: uploadInfo.upload.headers,
-      body: file
-    })
+      body: file,
+    });
 
     if (!putResponse.ok) {
-      throw new Error(`Upload failed: ${putResponse.status}`)
+      throw new Error(`Upload failed: ${putResponse.status}`);
     }
 
     const confirmResponse = await apiFetch(`/assets/${uploadInfo.asset.assetId}/confirm`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        size: file.size
-      })
-    })
+        size: file.size,
+      }),
+    });
 
     if (!confirmResponse.ok) {
-      throw new Error(`Confirm upload failed: ${confirmResponse.status}`)
+      throw new Error(`Confirm upload failed: ${confirmResponse.status}`);
     }
 
-    const asset = (await confirmResponse.json()) as Asset
-    assets.value = [asset, ...assets.value.filter((item) => item.assetId !== asset.assetId)]
-    selectedAssetIds.value = Array.from(new Set([asset.assetId, ...selectedAssetIds.value]))
-    successMessage.value = 'Asset uploaded.'
+    const asset = (await confirmResponse.json()) as Asset;
+    assets.value = [asset, ...assets.value.filter((item) => item.assetId !== asset.assetId)];
+    selectedAssetIds.value = Array.from(new Set([asset.assetId, ...selectedAssetIds.value]));
+    successMessage.value = 'Asset uploaded.';
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Upload asset failed'
+    errorMessage.value = error instanceof Error ? error.message : 'Upload asset failed';
   } finally {
-    input.value = ''
-    isUploadingAsset.value = false
+    input.value = '';
+    isUploadingAsset.value = false;
   }
 }
 
 async function downloadAsset(asset: Asset) {
-  errorMessage.value = ''
-  successMessage.value = ''
+  errorMessage.value = '';
+  successMessage.value = '';
 
   try {
     const response = await apiFetch(`/assets/${asset.assetId}/download`, {
-      method: 'POST'
-    })
+      method: 'POST',
+    });
 
     if (!response.ok) {
-      throw new Error(`Create download failed: ${response.status}`)
+      throw new Error(`Create download failed: ${response.status}`);
     }
 
-    const result = (await response.json()) as { url: string }
-    window.open(result.url, '_blank', 'noopener')
+    const result = (await response.json()) as { url: string };
+    window.open(result.url, '_blank', 'noopener');
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Create download failed'
+    errorMessage.value = error instanceof Error ? error.message : 'Create download failed';
   }
 }
 
 async function createTask() {
-  errorMessage.value = ''
-  successMessage.value = ''
-  isSubmitting.value = true
+  errorMessage.value = '';
+  successMessage.value = '';
+  isSubmitting.value = true;
 
   try {
     const response = await apiFetch('/generation/tasks', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         projectId: selectedProjectId.value || undefined,
@@ -397,171 +397,171 @@ async function createTask() {
         model: 'mock-image-v1',
         prompt: prompt.value,
         ratio: ratio.value,
-        referenceAssetIds: selectedAssetIds.value
-      })
-    })
+        referenceAssetIds: selectedAssetIds.value,
+      }),
+    });
 
     if (!response.ok) {
-      throw new Error(`Create task failed: ${response.status}`)
+      throw new Error(`Create task failed: ${response.status}`);
     }
 
-    const result = (await response.json()) as CreateTaskResponse
-    activeTaskId.value = result.taskId
-    await refreshActiveTask()
-    await loadTasks()
+    const result = (await response.json()) as CreateTaskResponse;
+    activeTaskId.value = result.taskId;
+    await refreshActiveTask();
+    await loadTasks();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Create task failed'
+    errorMessage.value = error instanceof Error ? error.message : 'Create task failed';
   } finally {
-    isSubmitting.value = false
+    isSubmitting.value = false;
   }
 }
 
 async function refreshActiveTask() {
   if (!activeTaskId.value) {
-    return
+    return;
   }
 
-  errorMessage.value = ''
-  successMessage.value = ''
-  isRefreshing.value = true
+  errorMessage.value = '';
+  successMessage.value = '';
+  isRefreshing.value = true;
 
   try {
-    const response = await apiFetch(`/generation/tasks/${activeTaskId.value}`)
+    const response = await apiFetch(`/generation/tasks/${activeTaskId.value}`);
 
     if (!response.ok) {
-      throw new Error(`Fetch task failed: ${response.status}`)
+      throw new Error(`Fetch task failed: ${response.status}`);
     }
 
-    activeTask.value = (await response.json()) as Task
+    activeTask.value = (await response.json()) as Task;
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Fetch task failed'
+    errorMessage.value = error instanceof Error ? error.message : 'Fetch task failed';
   } finally {
-    isRefreshing.value = false
+    isRefreshing.value = false;
   }
 }
 
 async function cancelActiveTask() {
   if (!activeTaskId.value) {
-    return
+    return;
   }
 
-  errorMessage.value = ''
-  successMessage.value = ''
-  isCanceling.value = true
+  errorMessage.value = '';
+  successMessage.value = '';
+  isCanceling.value = true;
 
   try {
     const response = await apiFetch(`/generation/tasks/${activeTaskId.value}/cancel`, {
-      method: 'POST'
-    })
+      method: 'POST',
+    });
 
     if (!response.ok) {
-      throw new Error(`Cancel task failed: ${response.status}`)
+      throw new Error(`Cancel task failed: ${response.status}`);
     }
 
-    await refreshActiveTask()
-    await loadTasks()
+    await refreshActiveTask();
+    await loadTasks();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Cancel task failed'
+    errorMessage.value = error instanceof Error ? error.message : 'Cancel task failed';
   } finally {
-    isCanceling.value = false
+    isCanceling.value = false;
   }
 }
 
 async function changePassword() {
-  errorMessage.value = ''
-  successMessage.value = ''
-  isChangingPassword.value = true
+  errorMessage.value = '';
+  successMessage.value = '';
+  isChangingPassword.value = true;
 
   try {
     const response = await apiFetch('/auth/change-password', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         currentPassword: currentPassword.value,
-        newPassword: newPassword.value
-      })
-    })
+        newPassword: newPassword.value,
+      }),
+    });
 
     if (!response.ok) {
-      throw new Error(`Change password failed: ${response.status}`)
+      throw new Error(`Change password failed: ${response.status}`);
     }
 
-    currentPassword.value = ''
-    newPassword.value = ''
-    successMessage.value = 'Password changed. Please sign in again.'
-    await signOut(false)
+    currentPassword.value = '';
+    newPassword.value = '';
+    successMessage.value = 'Password changed. Please sign in again.';
+    await signOut(false);
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Change password failed'
+    errorMessage.value = error instanceof Error ? error.message : 'Change password failed';
   } finally {
-    isChangingPassword.value = false
+    isChangingPassword.value = false;
   }
 }
 
 async function loadTasks() {
   if (!accessToken.value) {
-    return
+    return;
   }
 
-  const response = await apiFetch('/generation/tasks')
+  const response = await apiFetch('/generation/tasks');
 
   if (!response.ok) {
-    return
+    return;
   }
 
-  const result = (await response.json()) as { items: Task[] }
-  tasks.value = result.items
+  const result = (await response.json()) as { items: Task[] };
+  tasks.value = result.items;
 }
 
 function selectTask(task: Task) {
-  activeTaskId.value = task.taskId
-  activeTask.value = task
+  activeTaskId.value = task.taskId;
+  activeTask.value = task;
 }
 
 function connectEvents() {
   if (!accessToken.value) {
-    return
+    return;
   }
 
-  eventSource?.close()
-  eventSourceStatus.value = 'connecting'
+  eventSource?.close();
+  eventSourceStatus.value = 'connecting';
   eventSource = new EventSource(
-    `${apiBaseUrl}/generation/tasks/events?access_token=${encodeURIComponent(accessToken.value)}`
-  )
+    `${apiBaseUrl}/generation/tasks/events?access_token=${encodeURIComponent(accessToken.value)}`,
+  );
 
   eventSource.onopen = () => {
-    eventSourceStatus.value = 'open'
-  }
+    eventSourceStatus.value = 'open';
+  };
 
   eventSource.onerror = () => {
-    eventSourceStatus.value = 'closed'
-  }
+    eventSourceStatus.value = 'closed';
+  };
 
   for (const eventName of ['task.queued', 'task.succeeded', 'task.failed', 'task.canceled']) {
     eventSource.addEventListener(eventName, (event) => {
-      const payload = JSON.parse(event.data) as { taskId: string }
+      const payload = JSON.parse(event.data) as { taskId: string };
 
       if (payload.taskId === activeTaskId.value) {
-        void refreshActiveTask()
+        void refreshActiveTask();
       }
 
-      void loadTasks()
-    })
+      void loadTasks();
+    });
   }
 }
 
 onMounted(async () => {
-  await loadProfile()
-  await loadProjects()
-  await loadAssets()
-  await loadTasks()
-  connectEvents()
-})
+  await loadProfile();
+  await loadProjects();
+  await loadAssets();
+  await loadTasks();
+  connectEvents();
+});
 
 onBeforeUnmount(() => {
-  eventSource?.close()
-})
+  eventSource?.close();
+});
 </script>
 
 <template>
@@ -647,7 +647,13 @@ onBeforeUnmount(() => {
   min-height: 100vh;
   padding: 40px 20px;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   color: #17202a;
   background: #f5f7fb;
 }
@@ -703,12 +709,12 @@ h2 {
   font-weight: 700;
 }
 
-.status[data-status="succeeded"] {
+.status[data-status='succeeded'] {
   color: #0f766e;
 }
 
-.status[data-status="failed"],
-.status[data-status="final_failed"] {
+.status[data-status='failed'],
+.status[data-status='final_failed'] {
   color: #b42318;
 }
 
