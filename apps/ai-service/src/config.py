@@ -6,6 +6,12 @@ class Settings(BaseSettings):
     rabbitmq_url: str = "amqp://aigc:aigc_password@localhost:5672/"
     model_provider: str = "mock"
     provider_mock_latency_seconds: float = 1.0
+    object_storage_endpoint: str = "localhost:9000"
+    object_storage_bucket: str = "aigc-assets"
+    object_storage_region: str = "local"
+    object_storage_access_key: str = "minioadmin"
+    object_storage_secret_key: str = "minioadmin"
+    object_storage_secure: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

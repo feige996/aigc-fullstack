@@ -1,5 +1,6 @@
 from ..config import settings
 from ..contracts import GenerationRequestMessage
+from ..storage import ObjectStorage
 from .base import GenerationProvider, ProviderError, ProviderResult
 from .mock_provider import MockProvider
 
@@ -35,9 +36,11 @@ class ProviderRegistry:
 
 
 def create_provider_registry() -> ProviderRegistry:
+    object_storage = ObjectStorage()
+
     return ProviderRegistry(
         providers=[
-            MockProvider(),
+            MockProvider(object_storage),
         ],
         default_provider_name=settings.model_provider,
     )
