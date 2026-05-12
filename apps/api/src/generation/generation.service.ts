@@ -1,41 +1,24 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import type { GenerationRequestMessage } from '@aigc/shared-contracts'
-import type { Prisma } from '@prisma/client'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { PrismaService } from '../prisma/prisma.service'
-import { CreateGenerationTaskDto } from './dto/create-generation-task.dto'
 import { GenerationEventsService } from './generation-events.service'
 import { GenerationPublisherService } from './generation-publisher.service'
 import type { AuthenticatedUser } from '../auth/auth.types'
-
-interface CreateTaskInput {
-  userId: string
-  dto: CreateGenerationTaskDto
-}
-
-interface UserScopedInput {
-  user: AuthenticatedUser
-}
-
-interface GetTaskInput extends UserScopedInput {
-  taskId: string
-}
-
-interface GetExecutionStateInput {
-  taskId: string
-  attemptId: string
-}
-
-interface RequestPayload {
-  clientRequestId?: string
-  projectId?: string
-  type: string
-  model: string
-  prompt: string
-  ratio?: string
-  duration?: number
-  referenceAssetIds: string[]
-}
+import {
+  hashGenerationPayload,
+  serializeGenerationTask,
+  taskAccessWhere,
+  toPrismaJson
+} from './generation.serializer'
+import type {
+  CreateTaskInput,
+  GenerationRequestPayload,
+  GetExecutionStateInput,
+  GetTaskInput,
+  PublishAttemptInput,
+  UserScopedInput
+} from './generation.types'
 
 @Injectable()
 export class GenerationService {
@@ -50,7 +33,7 @@ export class GenerationService {
       userId,
       projectId: dto.projectId
     })
-    const requestPayload: RequestPayload = {
+    const requestPayload: GenerationRequestPayload = {
       clientRequestId: dto.clientRequestId,
       projectId: projectId ?? undefined,
       type: dto.type,
@@ -61,7 +44,7 @@ export class GenerationService {
       referenceAssetIds: dto.referenceAssetIds ?? []
     }
 
-    const requestPayloadHash = this.hashPayload(requestPayload)
+    const requestPayloadHash = hashGenerationPayload(requestPayload)
 
     const task = await this.prisma.$transaction(async (tx) => {
       const createdTask = await tx.generationTask.create({
@@ -73,7 +56,7 @@ export class GenerationService {
           status: 'pending',
           stage: 'queue_publish',
           billingStatus: 'none',
-          requestPayload: this.toJson(requestPayload),
+          requestPayload: toPrismaJson(requestPayload),
           maxAttempts: 3
         }
       })
@@ -112,7 +95,7 @@ export class GenerationService {
     const existingTask = await this.prisma.generationTask.findFirst({
       where: {
         id: taskId,
-        ...this.taskAccessWhere(user)
+        ...taskAccessWhere(user)
       },
       include: {
         attempts: {
@@ -135,9 +118,9 @@ export class GenerationService {
       throw new BadRequestException('Task has reached max attempts')
     }
 
-    const requestPayload = existingTask.requestPayload as unknown as RequestPayload
+    const requestPayload = existingTask.requestPayload as unknown as GenerationRequestPayload
     const nextAttemptNo = (existingTask.attempts[0]?.attemptNo ?? 0) + 1
-    const requestPayloadHash = this.hashPayload(requestPayload)
+    const requestPayloadHash = hashGenerationPayload(requestPayload)
 
     const task = await this.prisma.$transaction(async (tx) => {
       const attempt = await tx.generationTaskAttempt.create({
@@ -177,7 +160,7 @@ export class GenerationService {
     const task = await this.prisma.generationTask.findFirst({
       where: {
         id: taskId,
-        ...this.taskAccessWhere(user)
+        ...taskAccessWhere(user)
       },
       include: {
         currentAttempt: true
@@ -251,7 +234,7 @@ export class GenerationService {
     })
 
     return {
-      items: tasks.map((task) => this.serializeTask(task))
+      items: tasks.map((task) => serializeGenerationTask(task))
     }
   }
 
@@ -267,7 +250,7 @@ export class GenerationService {
     })
 
     return {
-      items: tasks.map((task) => this.serializeTask(task))
+      items: tasks.map((task) => serializeGenerationTask(task))
     }
   }
 
@@ -275,7 +258,7 @@ export class GenerationService {
     const task = await this.prisma.generationTask.findFirst({
       where: {
         id: taskId,
-        ...this.taskAccessWhere(user)
+        ...taskAccessWhere(user)
       },
       include: {
         currentAttempt: true,
@@ -291,7 +274,7 @@ export class GenerationService {
       throw new NotFoundException(`Generation task ${taskId} was not found`)
     }
 
-    return this.serializeTask(task)
+    return serializeGenerationTask(task)
   }
 
   async getExecutionState({ taskId, attemptId }: GetExecutionStateInput) {
@@ -354,56 +337,6 @@ export class GenerationService {
     }
   }
 
-  private serializeTask(task: {
-    id: string
-    userId: string
-    projectId: string | null
-    type: string
-    model: string
-    status: string
-    stage: string
-    failureCode: string | null
-    billingStatus: string
-    currentAttemptId: string | null
-    maxAttempts: number
-    requestPayload: unknown
-    createdAt: Date
-    updatedAt: Date
-    completedAt: Date | null
-    currentAttempt?: unknown
-    attempts?: unknown[]
-  }) {
-    return {
-      taskId: task.id,
-      userId: task.userId,
-      projectId: task.projectId,
-      type: task.type,
-      model: task.model,
-      status: task.status,
-      stage: task.stage,
-      failureCode: task.failureCode,
-      billingStatus: task.billingStatus,
-      currentAttemptId: task.currentAttemptId,
-      maxAttempts: task.maxAttempts,
-      requestPayload: task.requestPayload,
-      currentAttempt: task.currentAttempt,
-      attempts: task.attempts,
-      createdAt: task.createdAt.toISOString(),
-      updatedAt: task.updatedAt.toISOString(),
-      completedAt: task.completedAt?.toISOString() ?? null
-    }
-  }
-
-  private taskAccessWhere(user: AuthenticatedUser) {
-    if (user.role === 'admin' || user.role === 'super_admin') {
-      return {}
-    }
-
-    return {
-      userId: user.id
-    }
-  }
-
   private async resolveProjectId({ userId, projectId }: { userId: string; projectId?: string }) {
     if (!projectId) {
       return null
@@ -427,21 +360,7 @@ export class GenerationService {
     return project.id
   }
 
-  private async publishAttempt({
-    userId,
-    taskId,
-    requestPayload,
-    attempt
-  }: {
-    userId: string
-    taskId: string
-    requestPayload: RequestPayload
-    attempt?: {
-      id: string
-      attemptNo: number
-      idempotencyKey: string
-    } | null
-  }) {
+  private async publishAttempt({ userId, taskId, requestPayload, attempt }: PublishAttemptInput) {
     if (!attempt) {
       throw new Error(`Task ${taskId} was created without current attempt`)
     }
@@ -546,11 +465,4 @@ export class GenerationService {
     }
   }
 
-  private hashPayload(payload: RequestPayload) {
-    return createHash('sha256').update(JSON.stringify(payload)).digest('hex')
-  }
-
-  private toJson(payload: RequestPayload): Prisma.InputJsonValue {
-    return JSON.parse(JSON.stringify(payload)) as Prisma.InputJsonValue
-  }
 }
