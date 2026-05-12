@@ -110,6 +110,28 @@ Authorization: Bearer <accessToken>
 
 Users see their own assets. `admin` and `super_admin` can see all assets.
 
+## Generated Output Assets
+
+When the AI worker publishes a succeeded generation result, the API result consumer creates asset metadata for each output:
+
+```txt
+generation.result task.succeeded
+  -> GenerationResultConsumerService
+  -> assets rows with task_id
+```
+
+Current behavior:
+
+- `type` is `model_output_raw`.
+- `status` is `active`.
+- `provider` comes from the provider result message.
+- `object_key` comes from `outputs[].objectPath`.
+- `bucket` defaults to `aigc-assets`, unless `objectPath` uses `s3://bucket/key`.
+- `mime_type` is inferred from output type.
+- `task_id`, `user_id`, and `project_id` are copied from the generation task.
+
+The first implementation records output metadata only. It does not yet download a provider URL and upload the binary file to MinIO. Real provider adapters should either return an object path that already points to managed storage, or a later media-processing step should copy remote outputs into object storage before marking the final asset active.
+
 ## Download URL
 
 ```http

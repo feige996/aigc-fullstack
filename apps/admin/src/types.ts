@@ -44,9 +44,29 @@ export interface GenerationTask {
   }
   currentAttempt?: GenerationAttempt
   attempts?: GenerationAttempt[]
+  assets?: Asset[]
   createdAt: string
   updatedAt: string
   completedAt: string | null
+}
+
+export interface Asset {
+  assetId: string
+  userId: string
+  projectId: string | null
+  taskId: string | null
+  type: string
+  status: string
+  provider: string
+  bucket: string
+  objectKey: string
+  mimeType: string
+  size: number | null
+  width: number | null
+  height: number | null
+  duration: number | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface AuthResponse {

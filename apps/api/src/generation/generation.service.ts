@@ -163,7 +163,8 @@ export class GenerationService {
         ...taskAccessWhere(user)
       },
       include: {
-        currentAttempt: true
+        currentAttempt: true,
+        assets: true
       }
     })
 
@@ -229,7 +230,8 @@ export class GenerationService {
       },
       take: 20,
       include: {
-        currentAttempt: true
+        currentAttempt: true,
+        assets: true
       }
     })
 
@@ -265,6 +267,11 @@ export class GenerationService {
         attempts: {
           orderBy: {
             attemptNo: 'asc'
+          }
+        },
+        assets: {
+          orderBy: {
+            createdAt: 'desc'
           }
         }
       }

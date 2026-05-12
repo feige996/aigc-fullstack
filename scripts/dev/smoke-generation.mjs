@@ -32,6 +32,14 @@ async function main() {
   if (task.status !== 'succeeded') {
     throw new Error(`Expected task to succeed, got ${task.status}`)
   }
+
+  const outputAssets = task.assets ?? []
+
+  if (outputAssets.length === 0) {
+    throw new Error(`Expected task ${task.taskId} to have at least one output asset`)
+  }
+
+  log(`output assets=${outputAssets.length} first=${outputAssets[0].objectKey}`)
 }
 
 async function login() {

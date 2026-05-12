@@ -48,6 +48,7 @@ export interface GenerationTaskRecord {
   completedAt: Date | null
   currentAttempt?: unknown
   attempts?: unknown[]
+  assets?: unknown[]
 }
 
 export interface PublishAttemptInput {

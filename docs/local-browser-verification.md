@@ -168,6 +168,7 @@ Expected output shape:
 [smoke] poll task=... status=queued
 [smoke] poll task=... status=succeeded
 [smoke] final task=... status=succeeded stage=completed
+[smoke] output assets=1 first=aigc/mock/.../output.png
 ```
 
 ## Verify RabbitMQ

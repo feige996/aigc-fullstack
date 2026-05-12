@@ -36,6 +36,7 @@ export interface GenerationTask {
     ratio?: string
     referenceAssetIds?: string[]
   }
+  assets?: Asset[]
   createdAt: string
   updatedAt: string
   completedAt: string | null

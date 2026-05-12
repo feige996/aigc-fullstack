@@ -3,6 +3,7 @@ import type { GenerationResultMessage } from '@aigc/shared-contracts'
 import { PrismaService } from '../prisma/prisma.service'
 import { RabbitmqService } from '../rabbitmq/rabbitmq.service'
 import { GenerationEventsService } from './generation-events.service'
+import { buildOutputAssetCreates } from './generation-output-assets'
 
 @Injectable()
 export class GenerationResultConsumerService implements OnModuleInit {
@@ -40,6 +41,7 @@ export class GenerationResultConsumerService implements OnModuleInit {
         where: { id: message.taskId },
         select: {
           userId: true,
+          projectId: true,
           status: true,
           currentAttemptId: true
         }
@@ -61,6 +63,22 @@ export class GenerationResultConsumerService implements OnModuleInit {
           endedAt: new Date()
         }
       })
+
+      const outputAssets = buildOutputAssetCreates({
+        task: {
+          id: message.taskId,
+          userId: task.userId,
+          projectId: task.projectId
+        },
+        message
+      })
+
+      if (outputAssets.length > 0) {
+        await tx.asset.createMany({
+          data: outputAssets,
+          skipDuplicates: true
+        })
+      }
 
       await tx.generationTask.update({
         where: { id: message.taskId },

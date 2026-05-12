@@ -47,6 +47,7 @@ apps/api/src/generation/
 - 任务取消和重试
 - RabbitMQ 任务发布
 - RabbitMQ 结果消费
+- 成功结果写入输出 Asset 元数据
 - SSE 任务事件推送
 
 ### Web

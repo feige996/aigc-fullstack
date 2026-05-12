@@ -19,6 +19,7 @@ export function serializeGenerationTask(task: GenerationTaskRecord) {
     requestPayload: task.requestPayload,
     currentAttempt: task.currentAttempt,
     attempts: task.attempts,
+    assets: task.assets,
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
     completedAt: task.completedAt?.toISOString() ?? null
