@@ -1,102 +1,19 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-
-type TaskStatus =
-  | 'draft'
-  | 'validating'
-  | 'rejected'
-  | 'pending'
-  | 'queued'
-  | 'running'
-  | 'retrying'
-  | 'succeeded'
-  | 'failed'
-  | 'final_failed'
-  | 'canceled'
-  | 'expired'
-
-interface CreateTaskResponse {
-  taskId: string
-  attemptId?: string
-  traceId?: string
-  status: TaskStatus
-  stage: string
-  failureCode?: string
-  billingStatus: string
-}
-
-interface GenerationTask {
-  taskId: string
-  projectId: string | null
-  type: string
-  model: string
-  status: TaskStatus
-  stage: string
-  failureCode: string | null
-  billingStatus: string
-  requestPayload: {
-    prompt?: string
-    ratio?: string
-    referenceAssetIds?: string[]
-  }
-  createdAt: string
-  updatedAt: string
-  completedAt: string | null
-}
-
-interface AuthResponse {
-  accessToken: string
-  refreshToken: string
-  tokenType: string
-  user: {
-    id: string
-    phoneNumber: string
-    role: string
-    status: string
-  }
-}
-
-interface StoredAuth {
-  accessToken: string
-  refreshToken: string
-}
-
-interface Project {
-  projectId: string
-  userId: string
-  name: string
-  description: string | null
-  status: string
-  taskCount?: number
-  createdAt: string
-  updatedAt: string
-}
-
-interface Asset {
-  assetId: string
-  userId: string
-  projectId: string | null
-  taskId: string | null
-  type: string
-  status: string
-  provider: string
-  bucket: string
-  objectKey: string
-  mimeType: string
-  size: number | null
-  createdAt: string
-  updatedAt: string
-}
-
-interface CreateAssetUploadResponse {
-  asset: Asset
-  upload: {
-    method: 'PUT'
-    url: string
-    headers: Record<string, string>
-    expiresInSeconds: number
-  }
-}
+import GenerationWorkspace from './features/aigc-generation/GenerationWorkspace.vue'
+import AccountPanel from './platform/AccountPanel.vue'
+import AssetPanel from './platform/AssetPanel.vue'
+import AuthPanel from './platform/AuthPanel.vue'
+import ProjectPanel from './platform/ProjectPanel.vue'
+import type {
+  Asset,
+  AuthResponse,
+  CreateAssetUploadResponse,
+  CreateTaskResponse,
+  GenerationTask,
+  Project,
+  StoredAuth
+} from './types'
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
@@ -643,180 +560,68 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
-      <section v-if="!isAuthenticated" class="panel auth-panel">
-        <label>
-          Phone
-          <input v-model="phoneNumber" type="tel" />
-        </label>
-        <label>
-          Password
-          <input v-model="password" type="password" />
-        </label>
-        <label>
-          Display Name
-          <input v-model="displayName" type="text" />
-        </label>
-        <div class="controls">
-          <button type="button" @click="authenticate('login')">Login</button>
-          <button type="button" @click="authenticate('register')">Register</button>
-        </div>
-        <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-        <p v-if="successMessage" class="success">{{ successMessage }}</p>
-      </section>
+      <AuthPanel
+        v-if="!isAuthenticated"
+        v-model:phone-number="phoneNumber"
+        v-model:password="password"
+        v-model:display-name="displayName"
+        :error-message="errorMessage"
+        :success-message="successMessage"
+        @login="authenticate('login')"
+        @register="authenticate('register')"
+      />
 
       <template v-else>
-      <div class="event-status">
-        User: <strong>{{ currentUser?.phoneNumber }}</strong> / SSE:
-        <strong>{{ eventSourceStatus }}</strong>
-      </div>
-
-      <section class="panel account-panel">
-        <h2>Account</h2>
-        <label>
-          Current Password
-          <input v-model="currentPassword" type="password" />
-        </label>
-        <label>
-          New Password
-          <input v-model="newPassword" type="password" />
-        </label>
-        <button type="button" :disabled="isChangingPassword" @click="changePassword">
-          {{ isChangingPassword ? 'Changing...' : 'Change Password' }}
-        </button>
-        <p v-if="successMessage" class="success">{{ successMessage }}</p>
-      </section>
-
-      <section class="panel project-panel">
-        <h2>Project</h2>
-        <label>
-          Active Project
-          <select v-model="selectedProjectId">
-            <option value="">No Project</option>
-            <option v-for="project in projects" :key="project.projectId" :value="project.projectId">
-              {{ project.name }}
-            </option>
-          </select>
-        </label>
-        <label>
-          New Project
-          <input v-model="projectName" type="text" />
-        </label>
-        <label>
-          Description
-          <input v-model="projectDescription" type="text" />
-        </label>
-        <button type="button" :disabled="isCreatingProject" @click="createProject">
-          {{ isCreatingProject ? 'Creating...' : 'Create Project' }}
-        </button>
-      </section>
-
-      <section class="panel asset-panel">
-        <h2>Assets</h2>
-        <label>
-          Upload Asset
-          <input type="file" :disabled="isUploadingAsset" @change="uploadAsset" />
-        </label>
-        <label>
-          Reference Assets
-          <select v-model="selectedAssetIds" multiple size="4">
-            <option v-for="asset in assets" :key="asset.assetId" :value="asset.assetId">
-              {{ asset.assetId }} / {{ asset.status }}
-            </option>
-          </select>
-        </label>
-        <div class="asset-summary">
-          <strong>{{ selectedAssetIds.length }}</strong>
-          <span>selected</span>
-        </div>
-      </section>
-
-      <section class="panel">
-        <label for="prompt">Prompt</label>
-        <textarea id="prompt" v-model="prompt" rows="5" />
-
-        <div class="controls">
-          <label>
-            Ratio
-            <select v-model="ratio">
-              <option value="1:1">1:1</option>
-              <option value="16:9">16:9</option>
-              <option value="9:16">9:16</option>
-            </select>
-          </label>
-
-          <button type="button" :disabled="isSubmitting" @click="createTask">
-            {{ isSubmitting ? 'Submitting...' : 'Submit Task' }}
-          </button>
-        </div>
-      </section>
-
-      <section class="panel result">
-        <div class="result-header">
-          <h2>Current Task</h2>
-          <button type="button" :disabled="!activeTaskId || isRefreshing" @click="refreshActiveTask">
-            {{ isRefreshing ? 'Refreshing...' : 'Refresh' }}
-          </button>
-          <button type="button" :disabled="!activeTaskId || isCanceling" @click="cancelActiveTask">
-            {{ isCanceling ? 'Canceling...' : 'Cancel' }}
-          </button>
+        <div class="event-status">
+          User: <strong>{{ currentUser?.phoneNumber }}</strong> / SSE:
+          <strong>{{ eventSourceStatus }}</strong>
         </div>
 
-        <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+        <AccountPanel
+          v-model:current-password="currentPassword"
+          v-model:new-password="newPassword"
+          :is-changing-password="isChangingPassword"
+          :success-message="successMessage"
+          @change-password="changePassword"
+        />
 
-        <dl v-if="activeTask">
-          <div>
-            <dt>Task ID</dt>
-            <dd>{{ activeTask.taskId }}</dd>
-          </div>
-          <div>
-            <dt>Project ID</dt>
-            <dd>{{ activeTask.projectId ?? 'none' }}</dd>
-          </div>
-          <div>
-            <dt>Assets</dt>
-            <dd>{{ activeTask.requestPayload.referenceAssetIds?.join(', ') || 'none' }}</dd>
-          </div>
-          <div>
-            <dt>Status</dt>
-            <dd>{{ activeTask.status }}</dd>
-          </div>
-          <div>
-            <dt>Stage</dt>
-            <dd>{{ activeTask.stage }}</dd>
-          </div>
-          <div>
-            <dt>Model</dt>
-            <dd>{{ activeTask.model }}</dd>
-          </div>
-          <div>
-            <dt>Updated</dt>
-            <dd>{{ activeTask.updatedAt }}</dd>
-          </div>
-        </dl>
-        <p v-else class="muted">No active task.</p>
-      </section>
+        <ProjectPanel
+          v-model:selected-project-id="selectedProjectId"
+          v-model:project-name="projectName"
+          v-model:project-description="projectDescription"
+          :projects="projects"
+          :is-creating-project="isCreatingProject"
+          @create-project="createProject"
+        />
 
-      <section class="panel">
-        <h2>Recent Tasks</h2>
-        <div class="task-list">
-          <button
-            v-for="task in tasks"
-            :key="task.taskId"
-            type="button"
-            class="task-row"
-            @click="selectTask(task)"
-          >
-            <span>{{ task.requestPayload.prompt }}</span>
-            <strong>{{ task.status }} / {{ task.projectId ?? 'none' }}</strong>
-          </button>
-        </div>
-      </section>
+        <AssetPanel
+          v-model:selected-asset-ids="selectedAssetIds"
+          :assets="assets"
+          :is-uploading-asset="isUploadingAsset"
+          @upload-asset="uploadAsset"
+        />
+
+        <GenerationWorkspace
+          v-model:prompt="prompt"
+          v-model:ratio="ratio"
+          :is-submitting="isSubmitting"
+          :active-task-id="activeTaskId"
+          :active-task="activeTask"
+          :tasks="tasks"
+          :is-refreshing="isRefreshing"
+          :is-canceling="isCanceling"
+          :error-message="errorMessage"
+          @create-task="createTask"
+          @refresh-active-task="refreshActiveTask"
+          @cancel-active-task="cancelActiveTask"
+          @select-task="selectTask"
+        />
       </template>
     </section>
   </main>
 </template>
 
-<style scoped>
+<style>
 .page {
   min-height: 100vh;
   padding: 40px 20px;
