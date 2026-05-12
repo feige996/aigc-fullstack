@@ -360,6 +360,26 @@ async function uploadAsset(event: Event) {
   }
 }
 
+async function downloadAsset(asset: Asset) {
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const response = await apiFetch(`/assets/${asset.assetId}/download`, {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      throw new Error(`Create download failed: ${response.status}`)
+    }
+
+    const result = (await response.json()) as { url: string }
+    window.open(result.url, '_blank', 'noopener')
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Create download failed'
+  }
+}
+
 async function createTask() {
   errorMessage.value = ''
   successMessage.value = ''
@@ -615,6 +635,7 @@ onBeforeUnmount(() => {
           @refresh-active-task="refreshActiveTask"
           @cancel-active-task="cancelActiveTask"
           @select-task="selectTask"
+          @download-asset="downloadAsset"
         />
       </template>
     </section>
@@ -908,6 +929,20 @@ dd {
   color: #687386;
 }
 
+.output-actions {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 10px;
+}
+
+.output-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  background: #fff;
+  color: #17202a;
+}
+
 @media (max-width: 640px) {
   .header,
   .header-actions,
@@ -928,6 +963,10 @@ dd {
 
   .output-row {
     grid-template-columns: 1fr;
+  }
+
+  .output-actions {
+    justify-content: start;
   }
 }
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GenerationTask } from '../../types'
+import type { Asset, GenerationTask } from '../../types'
 
 defineProps<{
   prompt: string
@@ -20,6 +20,7 @@ defineEmits<{
   refreshActiveTask: []
   cancelActiveTask: []
   selectTask: [task: GenerationTask]
+  downloadAsset: [asset: Asset]
 }>()
 </script>
 
@@ -104,10 +105,13 @@ defineEmits<{
               <strong>{{ asset.type }} / {{ asset.status }}</strong>
               <span>{{ asset.objectKey }}</span>
             </div>
-            <small>
-              {{ asset.mimeType }}
-              <template v-if="asset.width && asset.height"> / {{ asset.width }}x{{ asset.height }}</template>
-            </small>
+            <div class="output-actions">
+              <small>
+                {{ asset.mimeType }}
+                <template v-if="asset.width && asset.height"> / {{ asset.width }}x{{ asset.height }}</template>
+              </small>
+              <button type="button" @click="$emit('downloadAsset', asset)">Download</button>
+            </div>
           </article>
         </div>
         <p v-else class="muted">No output assets.</p>

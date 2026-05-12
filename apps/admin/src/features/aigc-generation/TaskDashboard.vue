@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GenerationTask, TaskStatus } from '../../types'
+import type { Asset, GenerationTask, TaskStatus } from '../../types'
 
 defineProps<{
   tasks: GenerationTask[]
@@ -19,6 +19,7 @@ defineEmits<{
   selectTask: [task: GenerationTask]
   retrySelectedTask: []
   cancelSelectedTask: []
+  downloadAsset: [asset: Asset]
 }>()
 </script>
 
@@ -119,6 +120,11 @@ defineEmits<{
           <el-table-column label="Size" width="110">
             <template #default="{ row }">
               {{ row.width && row.height ? `${row.width}x${row.height}` : '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="Actions" width="120" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" @click="$emit('downloadAsset', row)">Download</el-button>
             </template>
           </el-table-column>
         </el-table>

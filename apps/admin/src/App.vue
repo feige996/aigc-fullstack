@@ -9,6 +9,7 @@ import type {
   ActiveView,
   AdminUser,
   AuthResponse,
+  Asset,
   GenerationTask,
   Project,
   StoredAuth,
@@ -510,6 +511,26 @@ async function changePassword() {
   }
 }
 
+async function downloadAsset(asset: Asset) {
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const response = await apiFetch(`/assets/${asset.assetId}/download`, {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      throw new Error(`Create download failed: ${response.status}`)
+    }
+
+    const result = (await response.json()) as { url: string }
+    window.open(result.url, '_blank', 'noopener')
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Create download failed'
+  }
+}
+
 function canRetry(task: GenerationTask | null) {
   return Boolean(task && task.status !== 'succeeded' && task.status !== 'running' && task.status !== 'retrying')
 }
@@ -632,6 +653,7 @@ onMounted(async () => {
               @select-task="selectTask"
               @retry-selected-task="retrySelectedTask"
               @cancel-selected-task="cancelSelectedTask"
+              @download-asset="downloadAsset"
             />
 
             <UserManagement
