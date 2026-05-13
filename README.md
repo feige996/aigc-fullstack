@@ -117,6 +117,9 @@ pnpm test
 pnpm typecheck
 ```
 
+仓库 CI 会在 push 到 `main` 和 Pull Request 时运行 `pnpm typecheck`、`pnpm lint`
+和 `pnpm build`。
+
 ## 架构
 
 主要运行链路：
