@@ -115,6 +115,8 @@ pnpm smoke:generation
 ```
 
 烟测会使用默认账号登录，创建一个 mock 文生图任务，等待任务成功，检查输出资产并下载文件。
+如果 API 不可用、登录失败、任务超时或资产下载失败，烟测会输出下一步排查建议。
+遇到任务长时间停在 `queued` 时，优先运行 `pnpm doctor` 检查 worker consumer。
 
 常用环境变量：
 

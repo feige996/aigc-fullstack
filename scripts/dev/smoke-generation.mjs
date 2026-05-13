@@ -8,6 +8,9 @@ const timeoutMs = Number(process.env.SMOKE_TIMEOUT_MS ?? 30000)
 const intervalMs = Number(process.env.SMOKE_INTERVAL_MS ?? 1000)
 
 async function main() {
+  log(`api=${apiBaseUrl}`)
+  log(`user=${phoneNumber} timeoutMs=${timeoutMs} intervalMs=${intervalMs}`)
+
   const auth = await login()
   log(`authenticated user=${auth.user.phoneNumber} role=${auth.user.role}`)
 
@@ -67,7 +70,13 @@ async function login() {
   })
 
   if (!response.ok) {
-    throw new Error(`Login failed: ${response.status} ${await response.text()}`)
+    throw new Error(
+      [
+        `Login failed: ${response.status} ${await response.text()}`,
+        'Check that the API is running, the database is reachable, and the seed user exists.',
+        'Default local credentials are SMOKE_PHONE_NUMBER=13900139000 and SMOKE_PASSWORD=password123.'
+      ].join('\n')
+    )
   }
 
   return response.json()
@@ -75,9 +84,11 @@ async function login() {
 
 async function waitForTask(accessToken, taskId) {
   const startedAt = Date.now()
+  let lastTask
 
   while (Date.now() - startedAt < timeoutMs) {
     const task = await apiFetch(`/generation/tasks/${taskId}`, accessToken)
+    lastTask = task
     log(`poll task=${task.taskId} status=${task.status}`)
 
     if (['succeeded', 'failed', 'final_failed', 'canceled', 'rejected', 'expired'].includes(task.status)) {
@@ -87,7 +98,15 @@ async function waitForTask(accessToken, taskId) {
     await sleep(intervalMs)
   }
 
-  throw new Error(`Timed out waiting for task ${taskId}`)
+  const lastStatus = lastTask ? `${lastTask.status}/${lastTask.stage}` : 'unknown'
+  const hints = [`Timed out waiting for task ${taskId}. Last status=${lastStatus}.`]
+
+  if (lastTask && lastTask.status === 'queued') {
+    hints.push('The task is still queued. Run `pnpm doctor` and check the AI worker consumer.')
+    hints.push('If image.generate.queue consumers=0, start worker with `pnpm dev` or `pnpm --filter @aigc/ai-service worker`.')
+  }
+
+  throw new Error(hints.join('\n'))
 }
 
 async function apiFetch(path, accessToken, init = {}) {
@@ -113,7 +132,13 @@ async function safeFetch(url, init) {
     return await fetch(url, init)
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Request failed: ${url} (${detail})`)
+    throw new Error(
+      [
+        `Request failed: ${url} (${detail})`,
+        'Check that the API is running with `pnpm dev` or `pnpm dev:generation`.',
+        'Run `pnpm doctor` for local service diagnostics.'
+      ].join('\n')
+    )
   }
 }
 
@@ -121,7 +146,12 @@ async function downloadFile(url) {
   const response = await safeFetch(url)
 
   if (!response.ok) {
-    throw new Error(`Download failed: ${response.status} ${await response.text()}`)
+    throw new Error(
+      [
+        `Download failed: ${response.status} ${await response.text()}`,
+        'Check MinIO and object storage settings, then run `pnpm doctor`.'
+      ].join('\n')
+    )
   }
 
   const buffer = await response.arrayBuffer()
