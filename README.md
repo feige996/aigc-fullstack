@@ -99,9 +99,11 @@ pnpm dev
 常用开发命令：
 
 ```txt
+pnpm setup           检查首次初始化状态，缺失 .env 时从 .env.example 创建
 pnpm dev             启动 Web、Admin、API、AI Service HTTP 服务和 AI worker
 pnpm dev:apps        启动 Web、Admin、API 和 AI Service HTTP 服务，不启动 worker
 pnpm dev:generation  启动 Web、API 和 AI worker
+pnpm doctor          检查本地依赖、服务和队列状态
 ```
 
 更多本地开发、烟测和排查说明见 [本地开发手册](./docs/local-development.md)。

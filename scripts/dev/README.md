@@ -50,8 +50,23 @@ pnpm doctor
 - 检查 Docker 基础设施容器是否运行。
 - 检查 API、MinIO 和 RabbitMQ 队列 consumer 状态。
 
+## setup.mjs
+
+运行命令：
+
+```bash
+pnpm setup
+```
+
+用途：
+
+- 检查首次本地开发初始化状态。
+- 如果 `.env` 不存在，从 `.env.example` 创建。
+- 检查 `node_modules` 和 `apps/ai-service/.venv` 是否存在。
+- 提示下一步需要运行的 Docker、dev 和 doctor 命令。
+
+`setup.mjs` 不会覆盖已有 `.env`，不会自动安装依赖，也不会自动启动 Docker 容器。
+
 ## 后续脚本预留
 
-后续可以在本目录增加：
-
-- `setup.mjs`：检查依赖、`.env` 和基础设施初始化。
+后续可以在本目录增加更多诊断脚本，例如端口占用检查或数据库迁移状态检查。

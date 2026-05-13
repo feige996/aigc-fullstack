@@ -5,6 +5,15 @@
 
 ## 首次初始化
 
+可以先运行本地初始化 helper：
+
+```bash
+pnpm setup
+```
+
+`pnpm setup` 会检查本地依赖状态，并在 `.env` 不存在时从 `.env.example` 创建。
+它不会覆盖已有 `.env`，不会自动安装依赖，也不会自动启动 Docker 容器。
+
 安装 Node workspace 依赖：
 
 ```bash
