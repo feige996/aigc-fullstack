@@ -41,7 +41,7 @@ docker compose -f infra/compose/docker-compose.yml up -d
 ```
 
 本地默认账号密码只用于开发环境，定义在 `infra/compose/docker-compose.yml` 和
-`.env.example`。
+`.env.example`。环境变量详情见 [环境变量说明](./env.md)。
 
 ## 开发命令
 

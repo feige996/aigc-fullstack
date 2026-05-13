@@ -155,6 +155,7 @@ apps/ai-service FastAPI Worker
 - [Feature Registry 设计](./docs/feature-registry.md)
 - [AIGC Generation Feature 边界](./docs/aigc-generation-feature.md)
 - [Task 契约设计](./docs/task-contracts.md)
+- [环境变量说明](./docs/env.md)
 - [本地开发手册](./docs/local-development.md)
 - [本地浏览器验证](./docs/local-browser-verification.md)
 - [认证账户模型](./docs/auth-account-model.md)
