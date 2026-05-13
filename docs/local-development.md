@@ -118,6 +118,17 @@ SMOKE_TIMEOUT_MS=30000
 SMOKE_INTERVAL_MS=1000
 ```
 
+## 本地环境诊断
+
+如果本地服务状态不确定，可以运行：
+
+```bash
+pnpm doctor
+```
+
+诊断会检查基础命令、`.env`、Docker 基础设施容器、API 健康检查、MinIO 健康检查和
+RabbitMQ 队列 consumer 状态。存在失败项时命令会返回非零退出码。
+
 ## queued 状态排查
 
 如果任务一直停在 `queued` / `queue_publish`，检查队列是否有 worker consumer：

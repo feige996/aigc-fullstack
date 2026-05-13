@@ -6,6 +6,7 @@
     "dev": "turbo run dev @aigc/ai-service#worker '--filter=./apps/*'",
     "dev:apps": "turbo dev '--filter=./apps/*'",
     "dev:generation": "turbo run @aigc/web#dev @aigc/api#dev @aigc/ai-service#worker",
+    "doctor": "node scripts/dev/doctor.mjs",
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",

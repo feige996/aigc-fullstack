@@ -35,9 +35,23 @@ SMOKE_TIMEOUT_MS=30000
 SMOKE_INTERVAL_MS=1000
 ```
 
+## doctor.mjs
+
+运行命令：
+
+```bash
+pnpm doctor
+```
+
+用途：
+
+- 检查本地基础命令是否可用。
+- 检查 `.env` 是否存在。
+- 检查 Docker 基础设施容器是否运行。
+- 检查 API、MinIO 和 RabbitMQ 队列 consumer 状态。
+
 ## 后续脚本预留
 
 后续可以在本目录增加：
 
 - `setup.mjs`：检查依赖、`.env` 和基础设施初始化。
-- `doctor.mjs`：检查 MySQL、RabbitMQ、MinIO、API 和 worker consumer 状态。
