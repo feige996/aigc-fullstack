@@ -23,7 +23,8 @@ pnpm smoke:generation
 
 - 已启动基础设施：`docker compose -f infra/compose/docker-compose.yml up -d`
 - 已启动 API 和 AI worker：推荐使用 `pnpm dev` 或 `pnpm dev:generation`
-- 已有可登录测试账号，默认使用 seed 账号
+- 已运行 `pnpm --filter @aigc/api prisma:migrate`
+- 已运行 `pnpm --filter @aigc/api seed`，默认使用 seed 管理员账号
 
 常用环境变量：
 

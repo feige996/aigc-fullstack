@@ -93,6 +93,8 @@ MinIO Console：http://localhost:9001
 ```bash
 cp .env.example .env
 docker compose -f infra/compose/docker-compose.yml up -d
+pnpm --filter @aigc/api prisma:migrate
+pnpm --filter @aigc/api seed
 pnpm dev
 ```
 

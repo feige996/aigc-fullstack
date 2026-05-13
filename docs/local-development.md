@@ -43,6 +43,37 @@ docker compose -f infra/compose/docker-compose.yml up -d
 本地默认账号密码只用于开发环境，定义在 `infra/compose/docker-compose.yml` 和
 `.env.example`。环境变量详情见 [环境变量说明](./env.md)。
 
+初始化数据库 schema：
+
+```bash
+pnpm --filter @aigc/api prisma:migrate
+```
+
+写入默认 seed 数据：
+
+```bash
+pnpm --filter @aigc/api seed
+```
+
+默认 seed 会创建或更新一个超级管理员账号：
+
+```txt
+phoneNumber：13900139000
+password：password123
+role：super_admin
+```
+
+可以通过这些环境变量覆盖默认 seed 账号：
+
+```txt
+SEED_ADMIN_PHONE_NUMBER
+SEED_ADMIN_PASSWORD
+SEED_ADMIN_DISPLAY_NAME
+```
+
+当数据库为空、迁移后需要补默认账号，或 smoke 登录失败时，重新运行 seed。
+seed 使用 upsert，不会重复创建同一手机号用户，但会更新该用户密码、显示名、角色和状态。
+
 ## 开发命令
 
 默认启动完整本地开发环境：
