@@ -69,6 +69,23 @@ pnpm setup
 
 `setup.mjs` 不会覆盖已有 `.env`，不会自动安装依赖，也不会自动启动 Docker 容器。
 
+## verify-docker-builds.mjs
+
+运行命令：
+
+```bash
+pnpm verify:docker-builds -- --dry-run
+pnpm verify:docker-builds
+```
+
+用途：
+
+- 从仓库根目录逐个构建 `web`、`admin`、`api` 和 `ai-service` 镜像。
+- 验证 Dockerfile、工作区依赖和构建上下文是否仍然匹配。
+- 支持 `--service <name>` 只验证单个服务，例如 `pnpm verify:docker-builds -- --service api`。
+
+`--dry-run` 只打印将要执行的 `docker build` 命令，不会构建镜像。
+
 ## 后续脚本预留
 
 后续可以在本目录增加更多诊断脚本，例如端口占用检查或数据库迁移状态检查。

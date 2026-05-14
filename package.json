@@ -13,6 +13,7 @@
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "smoke:generation": "node scripts/dev/smoke-generation.mjs",
+    "verify:docker-builds": "node scripts/dev/verify-docker-builds.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,vue,json,md,yml,yaml}\""
   },
   "devDependencies": {
