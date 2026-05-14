@@ -138,8 +138,10 @@ RabbitMQ Management：http://localhost:15672
 MinIO Console：http://localhost:9001
 ```
 
-如果端口已被占用，Vite 可能会自动选择下一个端口；API 和 AI Service HTTP
-服务默认不会自动换端口。
+如果端口已被占用，Vite 可能会自动选择下一个端口；AI Service HTTP 默认优先使用
+8000，8000 被占用时会自动向后选择可用端口。API 默认不会自动换端口。
+也可以通过 `AI_SERVICE_PORT=<port> pnpm --filter @aigc/ai-service dev` 指定 AI
+Service HTTP 端口。
 
 ## 生成链路烟测
 
