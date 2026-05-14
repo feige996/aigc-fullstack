@@ -27,7 +27,6 @@ const route = useRoute()
 const router = useRouter()
 const phoneNumber = ref('13900139000')
 const password = ref('password123')
-const displayName = ref('Admin User')
 const tasks = ref<Task[]>([])
 const selectedTask = ref<Task | null>(null)
 const users = ref<AdminUser[]>([])
@@ -57,6 +56,7 @@ const succeededTasks = computed(
 const isAuthenticated = api.isAuthenticated
 const currentUser = api.currentUser
 const isSuperAdmin = computed(() => currentUser.value?.role === 'super_admin')
+const isLoginRoute = computed(() => route.path === '/login')
 const activeView = computed<ActiveView>(() => {
   if (route.path === '/users') {
     return 'users'
@@ -104,18 +104,31 @@ function toErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
 }
 
-async function authenticate(mode: 'login' | 'register') {
+function safeRedirectPath(value: unknown) {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) {
+    return '/tasks'
+  }
+
+  if (value === '/login') {
+    return '/tasks'
+  }
+
+  return value
+}
+
+async function authenticate() {
   resetMessages()
 
   try {
-    await api.authenticate(mode, {
+    await api.authenticate('login', {
       phoneNumber: phoneNumber.value,
       password: password.value,
-      displayName: displayName.value,
+      displayName: '',
     })
-    await loadCurrentView()
+    await loadProfile()
+    await router.push(safeRedirectPath(route.query.redirect))
   } catch (error) {
-    errorMessage.value = toErrorMessage(error, `${mode} failed`)
+    errorMessage.value = toErrorMessage(error, 'Login failed')
   }
 }
 
@@ -123,6 +136,15 @@ async function loadProfile() {
   const profile = await api.loadProfile()
 
   if (!profile) {
+    if (!isLoginRoute.value) {
+      await router.replace({
+        path: '/login',
+        query: {
+          redirect: route.fullPath,
+        },
+      })
+    }
+
     return
   }
 
@@ -138,7 +160,7 @@ async function signOut(callServer = true) {
   selectedTask.value = null
   users.value = []
   projects.value = []
-  await router.push('/tasks')
+  await router.push('/login')
 }
 
 async function loadCurrentView() {
@@ -457,7 +479,10 @@ function refreshLoading() {
 
 onMounted(async () => {
   await loadProfile()
-  await loadCurrentView()
+
+  if (isAuthenticated.value && !isLoginRoute.value) {
+    await loadCurrentView()
+  }
 })
 
 watch(
@@ -465,7 +490,7 @@ watch(
   async () => {
     resetMessages()
 
-    if (isAuthenticated.value) {
+    if (isAuthenticated.value && !isLoginRoute.value) {
       await loadCurrentView()
     }
   },
@@ -474,7 +499,30 @@ watch(
 
 <template>
   <el-config-provider>
-    <el-container class="layout">
+    <main v-if="isLoginRoute" class="login-page">
+      <section class="login-panel">
+        <div class="login-copy">
+          <p>AIGC Admin</p>
+          <h1>Sign in to manage generation operations.</h1>
+        </div>
+
+        <el-alert
+          v-if="errorMessage"
+          :title="errorMessage"
+          type="error"
+          show-icon
+          class="alert"
+        />
+
+        <AuthCard
+          v-model:phone-number="phoneNumber"
+          v-model:password="password"
+          @login="authenticate"
+        />
+      </section>
+    </main>
+
+    <el-container v-else class="layout">
       <el-aside width="232px" class="aside">
         <div class="brand">AIGC Admin</div>
         <el-menu
@@ -532,16 +580,7 @@ watch(
             class="alert"
           />
 
-          <AuthCard
-            v-if="!isAuthenticated"
-            v-model:phone-number="phoneNumber"
-            v-model:password="password"
-            v-model:display-name="displayName"
-            @login="authenticate('login')"
-            @register="authenticate('register')"
-          />
-
-          <template v-else>
+          <template v-if="isAuthenticated">
             <AccountCard
               v-if="activeView === 'account'"
               v-model:current-password="currentPassword"
@@ -598,6 +637,33 @@ watch(
   background: #f6f7f9;
 }
 
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: #f6f7f9;
+}
+
+.login-panel {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 16px;
+}
+
+.login-copy p {
+  margin: 0 0 8px;
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.login-copy h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
 .aside {
   color: #fff;
   background: #1f2937;
@@ -652,7 +718,7 @@ watch(
 }
 
 .auth-card {
-  max-width: 420px;
+  width: 100%;
 }
 
 .auth-actions {

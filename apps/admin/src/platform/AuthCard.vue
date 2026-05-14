@@ -2,15 +2,12 @@
 defineProps<{
   phoneNumber: string
   password: string
-  displayName: string
 }>()
 
 defineEmits<{
   'update:phoneNumber': [value: string]
   'update:password': [value: string]
-  'update:displayName': [value: string]
   login: []
-  register: []
 }>()
 </script>
 
@@ -32,15 +29,8 @@ defineEmits<{
           @update:model-value="$emit('update:password', String($event))"
         />
       </el-form-item>
-      <el-form-item label="Display Name">
-        <el-input
-          :model-value="displayName"
-          @update:model-value="$emit('update:displayName', String($event))"
-        />
-      </el-form-item>
       <div class="auth-actions">
         <el-button type="primary" @click="$emit('login')">Login</el-button>
-        <el-button @click="$emit('register')">Register</el-button>
       </div>
     </el-form>
   </el-card>
