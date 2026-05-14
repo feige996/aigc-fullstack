@@ -1,6 +1,6 @@
-# AIGC Fullstack
+# 智枢平台
 
-AIGC 全栈 monorepo，用于管理用户端生成工作流、运营后台、主业务 API 和 AI Worker 服务。
+智枢平台是一个面向生成式 AI 业务的企业级全栈平台模板，用于管理用户端工作台、运营后台、主业务 API 和 AI Worker 服务。
 
 ## 技术栈
 
@@ -72,6 +72,8 @@ uv sync
 ```bash
 docker compose -f infra/compose/docker-compose.yml up -d
 ```
+
+部署模板和 healthcheck 约定见 [部署说明](./docs/deployment.md)。
 
 服务地址：
 

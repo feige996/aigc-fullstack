@@ -1,5 +1,5 @@
 {
-  "name": "aigc-fullstack",
+  "name": "zhishu-platform",
   "private": true,
   "packageManager": "pnpm@10.10.0",
   "scripts": {
