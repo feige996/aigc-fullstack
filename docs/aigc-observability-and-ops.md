@@ -30,6 +30,14 @@ failureCode
 idempotencyKey
 ```
 
+最小基线建议：
+
+- HTTP 请求统一透传 `x-request-id` 和 `x-trace-id`。
+- 若上游未提供，服务端自己生成 `requestId`，并默认把 `traceId` 设为同值。
+- API 创建任务时继续生成业务 `traceId`，并在返回值、消息和 worker 日志中复用。
+- 结构化日志至少记录 `event`、`requestId`、`traceId`、`taskId`、`attemptId`、`status`、`durationMs`。
+- API 和 AI Service 的 `/health` 都应返回 `service`、`status`、`uptimeSeconds` 和基础检查信息。
+
 ## 日志规范
 
 关键节点必须打结构化日志：
@@ -55,6 +63,14 @@ idempotencyKey
 - 未脱敏手机号、邮箱。
 - 供应商密钥。
 - 高敏 Prompt 原文。
+
+建议健康检查至少返回：
+
+- `service`
+- `status`
+- `uptimeSeconds`
+- `checks`
+- 必要时附带运行模式或依赖状态摘要
 
 ## 指标
 

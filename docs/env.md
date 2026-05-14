@@ -36,8 +36,11 @@
 
 | 变量 | 默认值 | 使用方 | 本地说明 | 生产说明 |
 | --- | --- | --- | --- | --- |
-| `JWT_SECRET` | `replace-me` | API | 本地 JWT 签名密钥 | 必须替换为高强度随机密钥 |
+| `JWT_ACCESS_SECRET` | `replace-me` | API | 本地 JWT 签名密钥 | 必须替换为高强度随机密钥 |
+| `JWT_SECRET` | 兼容别名 | API | 旧变量名，启动时仍可识别 | 迁移完成后可以移除 |
 | `SSE_TICKET_SECRET` | `replace-me` | API | 本地 SSE ticket 签名密钥 | 必须替换为高强度随机密钥 |
+
+> 生产环境会额外拒绝 `localhost`、`minioadmin`、`replace-me` 这类明显的占位值。
 
 ## Seed 和 smoke 可选变量
 

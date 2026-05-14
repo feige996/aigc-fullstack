@@ -8,7 +8,11 @@ export class HealthController {
   check() {
     return {
       service: 'api',
-      status: 'ok'
+      status: 'ok',
+      uptimeSeconds: Math.round(process.uptime()),
+      checks: {
+        http: 'ready'
+      }
     }
   }
 }

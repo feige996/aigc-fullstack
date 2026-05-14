@@ -5,14 +5,13 @@ import AccountCard from './platform/AccountCard.vue'
 import AuthCard from './platform/AuthCard.vue'
 import ProjectManagement from './platform/ProjectManagement.vue'
 import UserManagement from './platform/UserManagement.vue'
+import { useApiClient } from './composables/useApiClient'
 import type {
   ActiveView,
   AdminUser,
-  AuthResponse,
   Asset,
   Task,
   Project,
-  StoredAuth,
   TaskStatus,
   UserRole,
   UserStatus
@@ -21,13 +20,10 @@ import type {
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.admin.auth'
+const api = useApiClient(apiBaseUrl, authStorageKey)
 const phoneNumber = ref('13900139000')
 const password = ref('password123')
 const displayName = ref('Admin User')
-const storedAuth = readStoredAuth()
-const accessToken = ref(storedAuth.accessToken)
-const refreshToken = ref(storedAuth.refreshToken)
-const currentUser = ref<AuthResponse['user'] | null>(null)
 const activeView = ref<ActiveView>('tasks')
 const tasks = ref<Task[]>([])
 const selectedTask = ref<Task | null>(null)
@@ -50,7 +46,8 @@ const failedTasks = computed(
   () => tasks.value.filter((task) => task.status === 'failed' || task.status === 'final_failed').length
 )
 const succeededTasks = computed(() => tasks.value.filter((task) => task.status === 'succeeded').length)
-const isAuthenticated = computed(() => Boolean(accessToken.value))
+const isAuthenticated = api.isAuthenticated
+const currentUser = api.currentUser
 const isSuperAdmin = computed(() => currentUser.value?.role === 'super_admin')
 const pageTitle = computed(() => {
   if (activeView.value === 'users') {
@@ -71,182 +68,50 @@ const pageDescription = computed(() => {
   return `Signed in as ${currentUser.value.phoneNumber}`
 })
 
-function readStoredAuth(): StoredAuth {
-  const rawValue = localStorage.getItem(authStorageKey)
-
-  if (!rawValue) {
-    return {
-      accessToken: '',
-      refreshToken: ''
-    }
-  }
-
-  try {
-    const parsed = JSON.parse(rawValue) as Partial<StoredAuth>
-
-    return {
-      accessToken: parsed.accessToken ?? '',
-      refreshToken: parsed.refreshToken ?? ''
-    }
-  } catch {
-    return {
-      accessToken: rawValue,
-      refreshToken: ''
-    }
-  }
+function resetMessages() {
+  errorMessage.value = ''
+  successMessage.value = ''
 }
 
-function storeAuth(result: AuthResponse) {
-  accessToken.value = result.accessToken
-  refreshToken.value = result.refreshToken
-  currentUser.value = result.user
-  localStorage.setItem(
-    authStorageKey,
-    JSON.stringify({
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken
-    })
-  )
-}
-
-function authHeaders(): Record<string, string> {
-  return accessToken.value
-    ? {
-        Authorization: `Bearer ${accessToken.value}`
-      }
-    : {}
+function toErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
 }
 
 async function authenticate(mode: 'login' | 'register') {
-  errorMessage.value = ''
-  successMessage.value = ''
+  resetMessages()
 
   try {
-    const response = await fetch(`${apiBaseUrl}/auth/${mode}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        phoneNumber: phoneNumber.value,
-        password: password.value,
-        displayName: displayName.value
-      })
+    await api.authenticate(mode, {
+      phoneNumber: phoneNumber.value,
+      password: password.value,
+      displayName: displayName.value
     })
-
-    if (!response.ok) {
-      throw new Error(`${mode} failed: ${response.status}`)
-    }
-
-    const result = (await response.json()) as AuthResponse
-
-    if (!['admin', 'super_admin'].includes(result.user.role)) {
-      throw new Error('No admin access')
-    }
-
-    storeAuth(result)
     await loadCurrentView()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : `${mode} failed`
+    errorMessage.value = toErrorMessage(error, `${mode} failed`)
   }
-}
-
-async function refreshAuth() {
-  if (!refreshToken.value) {
-    return false
-  }
-
-  const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      refreshToken: refreshToken.value
-    })
-  })
-
-  if (!response.ok) {
-    return false
-  }
-
-  const result = (await response.json()) as AuthResponse
-
-  if (!['admin', 'super_admin'].includes(result.user.role)) {
-    return false
-  }
-
-  storeAuth(result)
-  return true
-}
-
-async function apiFetch(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      ...authHeaders(),
-      ...(init.headers ?? {})
-    }
-  })
-
-  if (response.status !== 401 || !retry) {
-    return response
-  }
-
-  const refreshed = await refreshAuth()
-
-  if (!refreshed) {
-    await signOut(false)
-    return response
-  }
-
-  return apiFetch(path, init, false)
 }
 
 async function loadProfile() {
-  if (!accessToken.value) {
+  const profile = await api.loadProfile()
+
+  if (!profile) {
     return
   }
 
-  const response = await apiFetch('/auth/me')
-
-  if (!response.ok) {
-    await signOut(false)
-    return
-  }
-
-  currentUser.value = (await response.json()) as AuthResponse['user']
-
-  if (!['admin', 'super_admin'].includes(currentUser.value.role)) {
+  if (!['admin', 'super_admin'].includes(profile.role)) {
     await signOut(false)
     errorMessage.value = 'No admin access'
   }
 }
 
 async function signOut(callServer = true) {
-  const tokenToRevoke = refreshToken.value
-
-  if (callServer && tokenToRevoke) {
-    await fetch(`${apiBaseUrl}/auth/logout`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        refreshToken: tokenToRevoke
-      })
-    }).catch(() => undefined)
-  }
-
-  accessToken.value = ''
-  refreshToken.value = ''
-  currentUser.value = null
+  await api.signOut(callServer)
   activeView.value = 'tasks'
   tasks.value = []
   selectedTask.value = null
   users.value = []
   projects.value = []
-  localStorage.removeItem(authStorageKey)
 }
 
 async function loadCurrentView() {
@@ -265,8 +130,7 @@ async function loadCurrentView() {
 
 async function setActiveView(view: ActiveView) {
   activeView.value = view
-  errorMessage.value = ''
-  successMessage.value = ''
+  resetMessages()
 
   if (!isAuthenticated.value) {
     return
@@ -276,79 +140,62 @@ async function setActiveView(view: ActiveView) {
 }
 
 async function loadTasks() {
-  if (!accessToken.value) {
+  if (!api.accessToken.value) {
     return
   }
 
   isLoading.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+  resetMessages()
 
   try {
-    const response = await apiFetch('/generation/tasks/admin')
-
-    if (!response.ok) {
-      throw new Error(`Load tasks failed: ${response.status}`)
-    }
-
-    const result = (await response.json()) as { items: Task[] }
+    const result = await api.requestJson<{ items: Task[] }>(
+      '/generation/tasks/admin',
+      {},
+      'Load tasks',
+    )
     tasks.value = result.items
 
     if (!selectedTask.value && result.items[0]) {
       await selectTask(result.items[0])
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Load tasks failed'
+    errorMessage.value = toErrorMessage(error, 'Load tasks failed')
   } finally {
     isLoading.value = false
   }
 }
 
 async function loadUsers() {
-  if (!accessToken.value) {
+  if (!api.accessToken.value) {
     return
   }
 
   isLoadingUsers.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+  resetMessages()
 
   try {
-    const response = await apiFetch('/admin/users')
-
-    if (!response.ok) {
-      throw new Error(`Load users failed: ${response.status}`)
-    }
-
-    const result = (await response.json()) as { items: AdminUser[] }
+    const result = await api.requestJson<{ items: AdminUser[] }>('/admin/users', {}, 'Load users')
     users.value = result.items
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Load users failed'
+    errorMessage.value = toErrorMessage(error, 'Load users failed')
   } finally {
     isLoadingUsers.value = false
   }
 }
 
 async function loadProjects() {
-  if (!accessToken.value) {
+  if (!api.accessToken.value) {
     return
   }
 
   isLoadingProjects.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+  resetMessages()
 
   try {
-    const response = await apiFetch('/projects')
-
-    if (!response.ok) {
-      throw new Error(`Load projects failed: ${response.status}`)
-    }
-
-    const result = (await response.json()) as { items: Project[] }
+    const result = await api.requestJson<{ items: Project[] }>('/projects', {}, 'Load projects')
     projects.value = result.items
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Load projects failed'
+    errorMessage.value = toErrorMessage(error, 'Load projects failed')
   } finally {
     isLoadingProjects.value = false
   }
@@ -368,23 +215,20 @@ async function updateUserRole(user: AdminUser, role: UserRole) {
 
 async function updateUser(userId: string, path: string, body: Record<string, string>) {
   updatingUserIds.value = new Set(updatingUserIds.value).add(userId)
-  errorMessage.value = ''
-  successMessage.value = ''
+  resetMessages()
 
   try {
-    const response = await apiFetch(path, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
+    const updatedUser = await api.requestJson<AdminUser>(
+      path,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
       },
-      body: JSON.stringify(body)
-    })
-
-    if (!response.ok) {
-      throw new Error(`Update user failed: ${response.status}`)
-    }
-
-    const updatedUser = (await response.json()) as AdminUser
+      'Update user',
+    )
     users.value = users.value.map((user) => (user.id === updatedUser.id ? updatedUser : user))
     successMessage.value = 'User updated.'
 
@@ -396,7 +240,7 @@ async function updateUser(userId: string, path: string, body: Record<string, str
       }
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Update user failed'
+    errorMessage.value = toErrorMessage(error, 'Update user failed')
   } finally {
     const nextUpdatingIds = new Set(updatingUserIds.value)
     nextUpdatingIds.delete(userId)
@@ -405,7 +249,7 @@ async function updateUser(userId: string, path: string, body: Record<string, str
 }
 
 async function selectTask(task: Task) {
-  const response = await apiFetch(`/generation/tasks/${task.taskId}`)
+  const response = await api.request(`/generation/tasks/${task.taskId}`)
 
   if (!response.ok) {
     selectedTask.value = task
@@ -421,19 +265,16 @@ async function retrySelectedTask() {
   }
 
   isRetrying.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+  resetMessages()
 
   try {
-    const response = await apiFetch(`/generation/tasks/${selectedTask.value.taskId}/retry`, {
-      method: 'POST'
-    })
-
-    if (!response.ok) {
-      throw new Error(`Retry task failed: ${response.status}`)
-    }
-
-    const retried = (await response.json()) as { taskId: string }
+    const retried = await api.requestJson<{ taskId: string }>(
+      `/generation/tasks/${selectedTask.value.taskId}/retry`,
+      {
+        method: 'POST'
+      },
+      'Retry task',
+    )
     await loadTasks()
     const task = tasks.value.find((item) => item.taskId === retried.taskId)
 
@@ -441,7 +282,7 @@ async function retrySelectedTask() {
       await selectTask(task)
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Retry task failed'
+    errorMessage.value = toErrorMessage(error, 'Retry task failed')
   } finally {
     isRetrying.value = false
   }
@@ -453,19 +294,16 @@ async function cancelSelectedTask() {
   }
 
   isCanceling.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+  resetMessages()
 
   try {
-    const response = await apiFetch(`/generation/tasks/${selectedTask.value.taskId}/cancel`, {
-      method: 'POST'
-    })
-
-    if (!response.ok) {
-      throw new Error(`Cancel task failed: ${response.status}`)
-    }
-
-    const canceled = (await response.json()) as { taskId: string }
+    const canceled = await api.requestJson<{ taskId: string }>(
+      `/generation/tasks/${selectedTask.value.taskId}/cancel`,
+      {
+        method: 'POST'
+      },
+      'Cancel task',
+    )
     await loadTasks()
     const task = tasks.value.find((item) => item.taskId === canceled.taskId)
 
@@ -473,7 +311,7 @@ async function cancelSelectedTask() {
       await selectTask(task)
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Cancel task failed'
+    errorMessage.value = toErrorMessage(error, 'Cancel task failed')
   } finally {
     isCanceling.value = false
   }
@@ -481,53 +319,49 @@ async function cancelSelectedTask() {
 
 async function changePassword() {
   isChangingPassword.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+  resetMessages()
 
   try {
-    const response = await apiFetch('/auth/change-password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
+    await api.requestJson(
+      '/auth/change-password',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          currentPassword: currentPassword.value,
+          newPassword: newPassword.value
+        })
       },
-      body: JSON.stringify({
-        currentPassword: currentPassword.value,
-        newPassword: newPassword.value
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error(`Change password failed: ${response.status}`)
-    }
+      'Change password',
+    )
 
     currentPassword.value = ''
     newPassword.value = ''
     successMessage.value = 'Password changed. Please sign in again.'
     await signOut(false)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Change password failed'
+    errorMessage.value = toErrorMessage(error, 'Change password failed')
   } finally {
     isChangingPassword.value = false
   }
 }
 
 async function downloadAsset(asset: Asset) {
-  errorMessage.value = ''
-  successMessage.value = ''
+  resetMessages()
 
   try {
-    const response = await apiFetch(`/assets/${asset.assetId}/download`, {
-      method: 'POST'
-    })
-
-    if (!response.ok) {
-      throw new Error(`Create download failed: ${response.status}`)
-    }
-
-    const result = (await response.json()) as { url: string }
+    const result = await api.requestJson<{ url: string }>(
+      `/assets/${asset.assetId}/download`,
+      {
+        method: 'POST'
+      },
+      'Create download',
+    )
     window.open(result.url, '_blank', 'noopener')
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Create download failed'
+    errorMessage.value = toErrorMessage(error, 'Create download failed')
   }
 }
 
@@ -547,18 +381,18 @@ function canCancel(task: Task | null) {
 
 function statusType(status: TaskStatus) {
   if (status === 'succeeded') {
-    return 'success'
+    return 'success' as const
   }
 
   if (status === 'failed' || status === 'final_failed' || status === 'rejected') {
-    return 'danger'
+    return 'danger' as const
   }
 
   if (status === 'queued' || status === 'running' || status === 'retrying') {
-    return 'warning'
+    return 'warning' as const
   }
 
-  return 'info'
+  return 'info' as const
 }
 
 function refreshLoading() {

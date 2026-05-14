@@ -5,26 +5,22 @@ import AccountPanel from './platform/AccountPanel.vue';
 import AssetPanel from './platform/AssetPanel.vue';
 import AuthPanel from './platform/AuthPanel.vue';
 import ProjectPanel from './platform/ProjectPanel.vue';
+import { useApiClient } from './composables/useApiClient';
 import type {
   Asset,
-  AuthResponse,
   CreateAssetUploadResponse,
   CreateTaskResponse,
   Task,
   Project,
-  StoredAuth,
 } from './types';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
 
 const authStorageKey = 'aigc.web.auth';
+const api = useApiClient(apiBaseUrl, authStorageKey);
 const phoneNumber = ref('13900139000');
 const password = ref('password123');
 const displayName = ref('Demo User');
-const storedAuth = readStoredAuth();
-const accessToken = ref(storedAuth.accessToken);
-const refreshToken = ref(storedAuth.refreshToken);
-const currentUser = ref<AuthResponse['user'] | null>(null);
 const projects = ref<Project[]>([]);
 const selectedProjectId = ref('');
 const projectName = ref('Default Project');
@@ -50,170 +46,44 @@ const eventSourceStatus = ref<'connecting' | 'open' | 'closed'>('closed');
 let eventSource: EventSource | null = null;
 
 const activeTaskStatusLabel = computed(() => activeTask.value?.status ?? 'idle');
-const isAuthenticated = computed(() => Boolean(accessToken.value));
+const isAuthenticated = api.isAuthenticated;
+const currentUser = api.currentUser;
 
-function readStoredAuth(): StoredAuth {
-  const rawValue = localStorage.getItem(authStorageKey);
-
-  if (!rawValue) {
-    return {
-      accessToken: '',
-      refreshToken: '',
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(rawValue) as Partial<StoredAuth>;
-
-    return {
-      accessToken: parsed.accessToken ?? '',
-      refreshToken: parsed.refreshToken ?? '',
-    };
-  } catch {
-    return {
-      accessToken: rawValue,
-      refreshToken: '',
-    };
-  }
+function resetMessages() {
+  errorMessage.value = '';
+  successMessage.value = '';
 }
 
-function storeAuth(result: AuthResponse) {
-  accessToken.value = result.accessToken;
-  refreshToken.value = result.refreshToken;
-  currentUser.value = result.user;
-  localStorage.setItem(
-    authStorageKey,
-    JSON.stringify({
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-    }),
-  );
-}
-
-function authHeaders(): Record<string, string> {
-  return accessToken.value
-    ? {
-        Authorization: `Bearer ${accessToken.value}`,
-      }
-    : {};
+function toErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 async function authenticate(mode: 'login' | 'register') {
-  errorMessage.value = '';
-  successMessage.value = '';
+  resetMessages();
 
   try {
-    const response = await fetch(`${apiBaseUrl}/auth/${mode}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        phoneNumber: phoneNumber.value,
-        password: password.value,
-        displayName: displayName.value,
-      }),
+    await api.authenticate(mode, {
+      phoneNumber: phoneNumber.value,
+      password: password.value,
+      displayName: displayName.value,
     });
-
-    if (!response.ok) {
-      throw new Error(`${mode} failed: ${response.status}`);
-    }
-
-    const result = (await response.json()) as AuthResponse;
-    storeAuth(result);
     await loadProjects();
     await loadAssets();
     await loadTasks();
     connectEvents();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : `${mode} failed`;
+    errorMessage.value = toErrorMessage(error, `${mode} failed`);
   }
-}
-
-async function refreshAuth() {
-  if (!refreshToken.value) {
-    return false;
-  }
-
-  const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      refreshToken: refreshToken.value,
-    }),
-  });
-
-  if (!response.ok) {
-    return false;
-  }
-
-  const result = (await response.json()) as AuthResponse;
-  storeAuth(result);
-  connectEvents();
-  return true;
-}
-
-async function apiFetch(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      ...authHeaders(),
-      ...(init.headers ?? {}),
-    },
-  });
-
-  if (response.status !== 401 || !retry) {
-    return response;
-  }
-
-  const refreshed = await refreshAuth();
-
-  if (!refreshed) {
-    await signOut(false);
-    return response;
-  }
-
-  return apiFetch(path, init, false);
 }
 
 async function loadProfile() {
-  if (!accessToken.value) {
-    return;
-  }
-
-  const response = await apiFetch('/auth/me');
-
-  if (!response.ok) {
-    await signOut(false);
-    return;
-  }
-
-  currentUser.value = (await response.json()) as AuthResponse['user'];
+  await api.loadProfile();
 }
 
 async function signOut(callServer = true) {
-  const tokenToRevoke = refreshToken.value;
-
-  if (callServer && tokenToRevoke) {
-    await fetch(`${apiBaseUrl}/auth/logout`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        refreshToken: tokenToRevoke,
-      }),
-    }).catch(() => undefined);
-  }
-
   eventSource?.close();
   eventSource = null;
   eventSourceStatus.value = 'closed';
-  accessToken.value = '';
-  refreshToken.value = '';
-  currentUser.value = null;
   activeTaskId.value = '';
   activeTask.value = null;
   tasks.value = [];
@@ -221,15 +91,15 @@ async function signOut(callServer = true) {
   selectedProjectId.value = '';
   assets.value = [];
   selectedAssetIds.value = [];
-  localStorage.removeItem(authStorageKey);
+  await api.signOut(callServer);
 }
 
 async function loadProjects() {
-  if (!accessToken.value) {
+  if (!api.accessToken.value) {
     return;
   }
 
-  const response = await apiFetch('/projects');
+  const response = await api.request('/projects');
 
   if (!response.ok) {
     return;
@@ -244,45 +114,42 @@ async function loadProjects() {
 }
 
 async function createProject() {
-  errorMessage.value = '';
-  successMessage.value = '';
+  resetMessages();
   isCreatingProject.value = true;
 
   try {
-    const response = await apiFetch('/projects', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const project = await api.requestJson<Project>(
+      '/projects',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: projectName.value,
+          description: projectDescription.value,
+        }),
       },
-      body: JSON.stringify({
-        name: projectName.value,
-        description: projectDescription.value,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Create project failed: ${response.status}`);
-    }
-
-    const project = (await response.json()) as Project;
+      'Create project',
+    );
     projects.value = [project, ...projects.value];
     selectedProjectId.value = project.projectId;
     projectName.value = '';
     projectDescription.value = '';
     successMessage.value = 'Project created.';
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Create project failed';
+    errorMessage.value = toErrorMessage(error, 'Create project failed');
   } finally {
     isCreatingProject.value = false;
   }
 }
 
 async function loadAssets() {
-  if (!accessToken.value) {
+  if (!api.accessToken.value) {
     return;
   }
 
-  const response = await apiFetch('/assets');
+  const response = await api.request('/assets');
 
   if (!response.ok) {
     return;
@@ -300,30 +167,27 @@ async function uploadAsset(event: Event) {
     return;
   }
 
-  errorMessage.value = '';
-  successMessage.value = '';
+  resetMessages();
   isUploadingAsset.value = true;
 
   try {
-    const createResponse = await apiFetch('/assets/uploads', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const uploadInfo = await api.requestJson<CreateAssetUploadResponse>(
+      '/assets/uploads',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'user_upload',
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          size: file.size,
+          projectId: selectedProjectId.value || undefined,
+        }),
       },
-      body: JSON.stringify({
-        type: 'user_upload',
-        fileName: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        size: file.size,
-        projectId: selectedProjectId.value || undefined,
-      }),
-    });
-
-    if (!createResponse.ok) {
-      throw new Error(`Create upload failed: ${createResponse.status}`);
-    }
-
-    const uploadInfo = (await createResponse.json()) as CreateAssetUploadResponse;
+      'Create upload',
+    );
     const putResponse = await fetch(uploadInfo.upload.url, {
       method: uploadInfo.upload.method,
       headers: uploadInfo.upload.headers,
@@ -334,26 +198,24 @@ async function uploadAsset(event: Event) {
       throw new Error(`Upload failed: ${putResponse.status}`);
     }
 
-    const confirmResponse = await apiFetch(`/assets/${uploadInfo.asset.assetId}/confirm`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const asset = await api.requestJson<Asset>(
+      `/assets/${uploadInfo.asset.assetId}/confirm`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          size: file.size,
+        }),
       },
-      body: JSON.stringify({
-        size: file.size,
-      }),
-    });
-
-    if (!confirmResponse.ok) {
-      throw new Error(`Confirm upload failed: ${confirmResponse.status}`);
-    }
-
-    const asset = (await confirmResponse.json()) as Asset;
+      'Confirm upload',
+    );
     assets.value = [asset, ...assets.value.filter((item) => item.assetId !== asset.assetId)];
     selectedAssetIds.value = Array.from(new Set([asset.assetId, ...selectedAssetIds.value]));
     successMessage.value = 'Asset uploaded.';
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Upload asset failed';
+    errorMessage.value = toErrorMessage(error, 'Upload asset failed');
   } finally {
     input.value = '';
     isUploadingAsset.value = false;
@@ -361,56 +223,50 @@ async function uploadAsset(event: Event) {
 }
 
 async function downloadAsset(asset: Asset) {
-  errorMessage.value = '';
-  successMessage.value = '';
+  resetMessages();
 
   try {
-    const response = await apiFetch(`/assets/${asset.assetId}/download`, {
-      method: 'POST',
-    });
-
-    if (!response.ok) {
-      throw new Error(`Create download failed: ${response.status}`);
-    }
-
-    const result = (await response.json()) as { url: string };
+    const result = await api.requestJson<{ url: string }>(
+      `/assets/${asset.assetId}/download`,
+      {
+        method: 'POST',
+      },
+      'Create download',
+    );
     window.open(result.url, '_blank', 'noopener');
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Create download failed';
+    errorMessage.value = toErrorMessage(error, 'Create download failed');
   }
 }
 
 async function createTask() {
-  errorMessage.value = '';
-  successMessage.value = '';
+  resetMessages();
   isSubmitting.value = true;
 
   try {
-    const response = await apiFetch('/generation/tasks', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const result = await api.requestJson<CreateTaskResponse>(
+      '/generation/tasks',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectId: selectedProjectId.value || undefined,
+          type: 'text_to_image',
+          model: 'mock-image-v1',
+          prompt: prompt.value,
+          ratio: ratio.value,
+          referenceAssetIds: selectedAssetIds.value,
+        }),
       },
-      body: JSON.stringify({
-        projectId: selectedProjectId.value || undefined,
-        type: 'text_to_image',
-        model: 'mock-image-v1',
-        prompt: prompt.value,
-        ratio: ratio.value,
-        referenceAssetIds: selectedAssetIds.value,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Create task failed: ${response.status}`);
-    }
-
-    const result = (await response.json()) as CreateTaskResponse;
+      'Create task',
+    );
     activeTaskId.value = result.taskId;
     await refreshActiveTask();
     await loadTasks();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Create task failed';
+    errorMessage.value = toErrorMessage(error, 'Create task failed');
   } finally {
     isSubmitting.value = false;
   }
@@ -421,20 +277,17 @@ async function refreshActiveTask() {
     return;
   }
 
-  errorMessage.value = '';
-  successMessage.value = '';
+  resetMessages();
   isRefreshing.value = true;
 
   try {
-    const response = await apiFetch(`/generation/tasks/${activeTaskId.value}`);
-
-    if (!response.ok) {
-      throw new Error(`Fetch task failed: ${response.status}`);
-    }
-
-    activeTask.value = (await response.json()) as Task;
+    activeTask.value = await api.requestJson<Task>(
+      `/generation/tasks/${activeTaskId.value}`,
+      {},
+      'Fetch task',
+    );
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Fetch task failed';
+    errorMessage.value = toErrorMessage(error, 'Fetch task failed');
   } finally {
     isRefreshing.value = false;
   }
@@ -445,66 +298,63 @@ async function cancelActiveTask() {
     return;
   }
 
-  errorMessage.value = '';
-  successMessage.value = '';
+  resetMessages();
   isCanceling.value = true;
 
   try {
-    const response = await apiFetch(`/generation/tasks/${activeTaskId.value}/cancel`, {
-      method: 'POST',
-    });
-
-    if (!response.ok) {
-      throw new Error(`Cancel task failed: ${response.status}`);
-    }
-
+    await api.requestJson(
+      `/generation/tasks/${activeTaskId.value}/cancel`,
+      {
+        method: 'POST',
+      },
+      'Cancel task',
+    );
     await refreshActiveTask();
     await loadTasks();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Cancel task failed';
+    errorMessage.value = toErrorMessage(error, 'Cancel task failed');
   } finally {
     isCanceling.value = false;
   }
 }
 
 async function changePassword() {
-  errorMessage.value = '';
-  successMessage.value = '';
+  resetMessages();
   isChangingPassword.value = true;
 
   try {
-    const response = await apiFetch('/auth/change-password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    await api.requestJson(
+      '/auth/change-password',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword: currentPassword.value,
+          newPassword: newPassword.value,
+        }),
       },
-      body: JSON.stringify({
-        currentPassword: currentPassword.value,
-        newPassword: newPassword.value,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Change password failed: ${response.status}`);
-    }
+      'Change password',
+    );
 
     currentPassword.value = '';
     newPassword.value = '';
     successMessage.value = 'Password changed. Please sign in again.';
     await signOut(false);
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Change password failed';
+    errorMessage.value = toErrorMessage(error, 'Change password failed');
   } finally {
     isChangingPassword.value = false;
   }
 }
 
 async function loadTasks() {
-  if (!accessToken.value) {
+  if (!api.accessToken.value) {
     return;
   }
 
-  const response = await apiFetch('/generation/tasks');
+  const response = await api.request('/generation/tasks');
 
   if (!response.ok) {
     return;
@@ -520,14 +370,14 @@ function selectTask(task: Task) {
 }
 
 function connectEvents() {
-  if (!accessToken.value) {
+  if (!api.accessToken.value) {
     return;
   }
 
   eventSource?.close();
   eventSourceStatus.value = 'connecting';
   eventSource = new EventSource(
-    `${apiBaseUrl}/generation/tasks/events?access_token=${encodeURIComponent(accessToken.value)}`,
+    `${apiBaseUrl}/generation/tasks/events?access_token=${encodeURIComponent(api.accessToken.value)}`,
   );
 
   eventSource.onopen = () => {

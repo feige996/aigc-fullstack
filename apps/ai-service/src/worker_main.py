@@ -3,10 +3,12 @@ import logging
 
 from .rabbitmq import connect
 from .workers.image_generate_worker import ImageGenerateWorker
+from .observability import log_json
 
 
 async def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    logging.basicConfig(level=logging.INFO)
+    log_json("info", "worker_start", service="ai-service")
 
     connection = await connect()
     try:

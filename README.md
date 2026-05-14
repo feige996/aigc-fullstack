@@ -124,6 +124,12 @@ pnpm typecheck
 仓库 CI 会在 push 到 `main` 和 Pull Request 时运行 Node 工作区的 `pnpm typecheck`、
 `pnpm lint`、`pnpm test` 和 `pnpm build`，并运行 AI Service 的 `ruff` 与 `pytest`。
 
+## 可观测性基线
+
+- API 和 AI Service 会透传 `x-request-id` / `x-trace-id`。
+- 两个服务都会输出轻量 JSON 访问日志，便于按请求和任务链路检索。
+- `/health` 会返回 `status`、`uptimeSeconds` 和基础检查信息，便于区分空 200 和可用状态。
+
 ## 架构
 
 主要运行链路：

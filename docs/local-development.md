@@ -40,6 +40,10 @@ cp .env.example .env
 docker compose -f infra/compose/docker-compose.yml up -d
 ```
 
+如果需要查看部署模板，可以参考：
+
+- [部署说明](./deployment.md)
+
 本地默认账号密码只用于开发环境，定义在 `infra/compose/docker-compose.yml` 和
 `.env.example`。环境变量详情见 [环境变量说明](./env.md)。
 

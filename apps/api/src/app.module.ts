@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { AdminModule } from './admin/admin.module'
 import { AssetsModule } from './assets/assets.module'
 import { AuthModule } from './auth/auth.module'
+import { validateEnv } from './config/env.validation'
 import { GenerationModule } from './generation/generation.module'
 import { HealthController } from './health.controller'
 import { ProjectsModule } from './projects/projects.module'
@@ -12,7 +13,8 @@ import { ProjectsModule } from './projects/projects.module'
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', join(process.cwd(), '../../.env')]
+      envFilePath: ['.env', join(process.cwd(), '../../.env')],
+      validate: validateEnv
     }),
     AdminModule,
     AssetsModule,

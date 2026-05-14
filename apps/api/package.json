@@ -38,6 +38,7 @@
     "@nestjs/testing": "^11.1.0",
     "@types/amqplib": "^0.10.8",
     "@types/bcryptjs": "^3.0.0",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.15.3",
     "@types/passport-jwt": "^4.0.1",
     "prisma": "^6.19.3",

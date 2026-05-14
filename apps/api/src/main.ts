@@ -1,9 +1,11 @@
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe } from '@nestjs/common'
 import { AppModule } from './app.module'
+import { httpObservabilityMiddleware } from './observability/http-observability.middleware'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
+  app.use(httpObservabilityMiddleware)
   app.enableCors({
     origin: true,
     credentials: true

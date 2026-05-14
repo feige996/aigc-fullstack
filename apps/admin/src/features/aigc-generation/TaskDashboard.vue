@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import type { Asset, Task, TaskStatus } from '../../types'
+import type { TagProps } from 'element-plus'
+
+type TagType = NonNullable<TagProps['type']>
 
 defineProps<{
   tasks: Task[]
@@ -12,7 +15,7 @@ defineProps<{
   isCanceling: boolean
   canRetry: (task: Task | null) => boolean
   canCancel: (task: Task | null) => boolean
-  statusType: (status: TaskStatus) => string
+  statusType: (status: TaskStatus) => TagType
 }>()
 
 defineEmits<{

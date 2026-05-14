@@ -1,0 +1,12 @@
+.venv
+__pycache__
+.pytest_cache
+.ruff_cache
+.turbo
+dist
+.idea
+.DS_Store
+.env
+.env.*
+coverage
+
