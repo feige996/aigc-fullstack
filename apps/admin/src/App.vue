@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import TaskDashboard from './features/aigc-generation/TaskDashboard.vue'
 import AccountCard from './platform/AccountCard.vue'
 import AuthCard from './platform/AuthCard.vue'
@@ -14,17 +15,19 @@ import type {
   Project,
   TaskStatus,
   UserRole,
-  UserStatus
+  UserStatus,
 } from './types'
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
 
 const authStorageKey = 'aigc.admin.auth'
 const api = useApiClient(apiBaseUrl, authStorageKey)
+const route = useRoute()
+const router = useRouter()
 const phoneNumber = ref('13900139000')
 const password = ref('password123')
 const displayName = ref('Admin User')
-const activeView = ref<ActiveView>('tasks')
 const tasks = ref<Task[]>([])
 const selectedTask = ref<Task | null>(null)
 const users = ref<AdminUser[]>([])
@@ -43,12 +46,32 @@ const newPassword = ref('')
 
 const totalTasks = computed(() => tasks.value.length)
 const failedTasks = computed(
-  () => tasks.value.filter((task) => task.status === 'failed' || task.status === 'final_failed').length
+  () =>
+    tasks.value.filter(
+      (task) => task.status === 'failed' || task.status === 'final_failed',
+    ).length,
 )
-const succeededTasks = computed(() => tasks.value.filter((task) => task.status === 'succeeded').length)
+const succeededTasks = computed(
+  () => tasks.value.filter((task) => task.status === 'succeeded').length,
+)
 const isAuthenticated = api.isAuthenticated
 const currentUser = api.currentUser
 const isSuperAdmin = computed(() => currentUser.value?.role === 'super_admin')
+const activeView = computed<ActiveView>(() => {
+  if (route.path === '/users') {
+    return 'users'
+  }
+
+  if (route.path === '/projects') {
+    return 'projects'
+  }
+
+  if (route.path === '/account') {
+    return 'account'
+  }
+
+  return 'tasks'
+})
 const pageTitle = computed(() => {
   if (activeView.value === 'users') {
     return 'Users'
@@ -56,6 +79,10 @@ const pageTitle = computed(() => {
 
   if (activeView.value === 'projects') {
     return 'Projects'
+  }
+
+  if (activeView.value === 'account') {
+    return 'Account'
   }
 
   return 'Generation Tasks'
@@ -84,7 +111,7 @@ async function authenticate(mode: 'login' | 'register') {
     await api.authenticate(mode, {
       phoneNumber: phoneNumber.value,
       password: password.value,
-      displayName: displayName.value
+      displayName: displayName.value,
     })
     await loadCurrentView()
   } catch (error) {
@@ -107,11 +134,11 @@ async function loadProfile() {
 
 async function signOut(callServer = true) {
   await api.signOut(callServer)
-  activeView.value = 'tasks'
   tasks.value = []
   selectedTask.value = null
   users.value = []
   projects.value = []
+  await router.push('/tasks')
 }
 
 async function loadCurrentView() {
@@ -125,18 +152,16 @@ async function loadCurrentView() {
     return
   }
 
+  if (activeView.value === 'account') {
+    return
+  }
+
   await loadTasks()
 }
 
 async function setActiveView(view: ActiveView) {
-  activeView.value = view
+  await router.push(`/${view}`)
   resetMessages()
-
-  if (!isAuthenticated.value) {
-    return
-  }
-
-  await loadCurrentView()
 }
 
 async function loadTasks() {
@@ -174,7 +199,11 @@ async function loadUsers() {
   resetMessages()
 
   try {
-    const result = await api.requestJson<{ items: AdminUser[] }>('/admin/users', {}, 'Load users')
+    const result = await api.requestJson<{ items: AdminUser[] }>(
+      '/admin/users',
+      {},
+      'Load users',
+    )
     users.value = result.items
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'Load users failed')
@@ -192,7 +221,11 @@ async function loadProjects() {
   resetMessages()
 
   try {
-    const result = await api.requestJson<{ items: Project[] }>('/projects', {}, 'Load projects')
+    const result = await api.requestJson<{ items: Project[] }>(
+      '/projects',
+      {},
+      'Load projects',
+    )
     projects.value = result.items
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'Load projects failed')
@@ -203,17 +236,21 @@ async function loadProjects() {
 
 async function updateUserStatus(user: AdminUser, status: UserStatus) {
   await updateUser(user.id, `/admin/users/${user.id}/status`, {
-    status
+    status,
   })
 }
 
 async function updateUserRole(user: AdminUser, role: UserRole) {
   await updateUser(user.id, `/admin/users/${user.id}/role`, {
-    role
+    role,
   })
 }
 
-async function updateUser(userId: string, path: string, body: Record<string, string>) {
+async function updateUser(
+  userId: string,
+  path: string,
+  body: Record<string, string>,
+) {
   updatingUserIds.value = new Set(updatingUserIds.value).add(userId)
   resetMessages()
 
@@ -223,20 +260,22 @@ async function updateUser(userId: string, path: string, body: Record<string, str
       {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       },
       'Update user',
     )
-    users.value = users.value.map((user) => (user.id === updatedUser.id ? updatedUser : user))
+    users.value = users.value.map((user) =>
+      user.id === updatedUser.id ? updatedUser : user,
+    )
     successMessage.value = 'User updated.'
 
     if (updatedUser.id === currentUser.value?.id) {
       currentUser.value = {
         ...currentUser.value,
         role: updatedUser.role,
-        status: updatedUser.status
+        status: updatedUser.status,
       }
     }
   } catch (error) {
@@ -271,7 +310,7 @@ async function retrySelectedTask() {
     const retried = await api.requestJson<{ taskId: string }>(
       `/generation/tasks/${selectedTask.value.taskId}/retry`,
       {
-        method: 'POST'
+        method: 'POST',
       },
       'Retry task',
     )
@@ -300,7 +339,7 @@ async function cancelSelectedTask() {
     const canceled = await api.requestJson<{ taskId: string }>(
       `/generation/tasks/${selectedTask.value.taskId}/cancel`,
       {
-        method: 'POST'
+        method: 'POST',
       },
       'Cancel task',
     )
@@ -327,12 +366,12 @@ async function changePassword() {
       {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           currentPassword: currentPassword.value,
-          newPassword: newPassword.value
-        })
+          newPassword: newPassword.value,
+        }),
       },
       'Change password',
     )
@@ -355,7 +394,7 @@ async function downloadAsset(asset: Asset) {
     const result = await api.requestJson<{ url: string }>(
       `/assets/${asset.assetId}/download`,
       {
-        method: 'POST'
+        method: 'POST',
       },
       'Create download',
     )
@@ -366,16 +405,21 @@ async function downloadAsset(asset: Asset) {
 }
 
 function canRetry(task: Task | null) {
-  return Boolean(task && task.status !== 'succeeded' && task.status !== 'running' && task.status !== 'retrying')
+  return Boolean(
+    task &&
+    task.status !== 'succeeded' &&
+    task.status !== 'running' &&
+    task.status !== 'retrying',
+  )
 }
 
 function canCancel(task: Task | null) {
   return Boolean(
     task &&
-      task.status !== 'succeeded' &&
-      task.status !== 'canceled' &&
-      task.status !== 'final_failed' &&
-      task.status !== 'rejected'
+    task.status !== 'succeeded' &&
+    task.status !== 'canceled' &&
+    task.status !== 'final_failed' &&
+    task.status !== 'rejected',
   )
 }
 
@@ -384,7 +428,11 @@ function statusType(status: TaskStatus) {
     return 'success' as const
   }
 
-  if (status === 'failed' || status === 'final_failed' || status === 'rejected') {
+  if (
+    status === 'failed' ||
+    status === 'final_failed' ||
+    status === 'rejected'
+  ) {
     return 'danger' as const
   }
 
@@ -411,6 +459,17 @@ onMounted(async () => {
   await loadProfile()
   await loadCurrentView()
 })
+
+watch(
+  () => route.path,
+  async () => {
+    resetMessages()
+
+    if (isAuthenticated.value) {
+      await loadCurrentView()
+    }
+  },
+)
 </script>
 
 <template>
@@ -428,6 +487,7 @@ onMounted(async () => {
           <el-menu-item index="tasks">Tasks</el-menu-item>
           <el-menu-item index="projects">Projects</el-menu-item>
           <el-menu-item index="users">Users</el-menu-item>
+          <el-menu-item index="account">Account</el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -438,10 +498,16 @@ onMounted(async () => {
             <p>{{ pageDescription }}</p>
           </div>
           <div class="header-actions">
-            <el-button v-if="isAuthenticated" @click="signOut()">Sign Out</el-button>
+            <span v-if="currentUser" class="user-pill">{{
+              currentUser.role
+            }}</span>
+            <el-button v-if="isAuthenticated" @click="signOut()"
+              >Sign Out</el-button
+            >
             <el-button
               type="primary"
               :disabled="!isAuthenticated"
+              v-if="activeView !== 'account'"
               :loading="refreshLoading()"
               @click="loadCurrentView"
             >
@@ -451,8 +517,20 @@ onMounted(async () => {
         </el-header>
 
         <el-main class="main">
-          <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon class="alert" />
-          <el-alert v-if="successMessage" :title="successMessage" type="success" show-icon class="alert" />
+          <el-alert
+            v-if="errorMessage"
+            :title="errorMessage"
+            type="error"
+            show-icon
+            class="alert"
+          />
+          <el-alert
+            v-if="successMessage"
+            :title="successMessage"
+            type="success"
+            show-icon
+            class="alert"
+          />
 
           <AuthCard
             v-if="!isAuthenticated"
@@ -465,6 +543,7 @@ onMounted(async () => {
 
           <template v-else>
             <AccountCard
+              v-if="activeView === 'account'"
               v-model:current-password="currentPassword"
               v-model:new-password="newPassword"
               :is-changing-password="isChangingPassword"
@@ -540,6 +619,7 @@ onMounted(async () => {
 
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 
@@ -560,6 +640,15 @@ onMounted(async () => {
 
 .alert {
   margin-bottom: -4px;
+}
+
+.user-pill {
+  padding: 5px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  color: #374151;
+  background: #f9fafb;
+  font-size: 12px;
 }
 
 .auth-card {
@@ -588,7 +677,7 @@ onMounted(async () => {
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -619,8 +708,32 @@ onMounted(async () => {
 }
 
 .table-card,
-.detail-card {
+.detail-card,
+.users-card,
+.projects-card {
   border-radius: 8px;
+}
+
+.card-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, auto) minmax(
+      150px,
+      auto
+    );
+  gap: 8px;
+  align-items: center;
+}
+
+.table-card .filters,
+.projects-card .filters {
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, auto);
 }
 
 .detail-card h2 {
@@ -636,6 +749,21 @@ onMounted(async () => {
 
 @media (max-width: 1100px) {
   .content {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filters,
+  .table-card .filters,
+  .projects-card .filters {
     grid-template-columns: 1fr;
   }
 }

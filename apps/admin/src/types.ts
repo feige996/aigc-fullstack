@@ -14,7 +14,7 @@ export type TaskStatus =
 
 export type UserRole = 'user' | 'admin' | 'super_admin'
 export type UserStatus = 'active' | 'disabled'
-export type ActiveView = 'tasks' | 'users' | 'projects'
+export type ActiveView = 'tasks' | 'users' | 'projects' | 'account'
 
 export interface GenerationAttempt {
   id: string
