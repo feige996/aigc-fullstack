@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000",
-    "worker": "uv run python -m src.worker_main"
+    "worker": "uv run python -m src.worker_main",
+    "lint": "uv run ruff check src tests",
+    "test": "uv run pytest"
   }
 }

@@ -6,8 +6,8 @@ AIGC 全栈 monorepo，用于管理用户端生成工作流、运营后台、主
 
 ```txt
 Monorepo：pnpm workspace + Turborepo
-用户端 Web：Vue 3 + TypeScript + Vite + chadcn/vue
-运营后台 Admin：Vue 3 + TypeScript + Vite + Element Plus
+用户端 Web：Vue 3 + TypeScript + Vite + Pinia
+运营后台 Admin：Vue 3 + TypeScript + Vite + Element Plus + Pinia
 主业务 API：NestJS + Prisma + MySQL
 AI 服务：FastAPI + uv
 队列：RabbitMQ
@@ -119,8 +119,8 @@ pnpm test
 pnpm typecheck
 ```
 
-仓库 CI 会在 push 到 `main` 和 Pull Request 时运行 `pnpm typecheck`、`pnpm lint`
-和 `pnpm build`。
+仓库 CI 会在 push 到 `main` 和 Pull Request 时运行 Node 工作区的 `pnpm typecheck`、
+`pnpm lint`、`pnpm test` 和 `pnpm build`，并运行 AI Service 的 `ruff` 与 `pytest`。
 
 ## 架构
 

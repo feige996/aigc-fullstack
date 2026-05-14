@@ -33,7 +33,39 @@ jobs:
         run: pnpm typecheck
 
       - name: Lint
-        run: pnpm lint
+        run: pnpm exec turbo lint --filter=!@aigc/ai-service
+
+      - name: Test
+        run: pnpm exec turbo test --filter=!@aigc/ai-service
 
       - name: Build
         run: pnpm build
+
+  python:
+    name: Python quality checks
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/ai-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check src tests
+
+      - name: Test
+        run: uv run pytest

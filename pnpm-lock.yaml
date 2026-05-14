@@ -168,12 +168,24 @@ importers:
 
   packages/shared-contracts:
     devDependencies:
+      '@types/node':
+        specifier: ^22.19.18
+        version: 22.19.18
+      tsx:
+        specifier: ^4.20.6
+        version: 4.21.0
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
 
   packages/shared-utils:
     devDependencies:
+      '@types/node':
+        specifier: ^22.19.18
+        version: 22.19.18
+      tsx:
+        specifier: ^4.20.6
+        version: 4.21.0
       typescript:
         specifier: ^5.8.3
         version: 5.9.3

@@ -7,7 +7,7 @@
 推荐结论：
 
 - 项目采用 monorepo 管理前端、后台、NestJS API、FastAPI AI 服务、共享契约、部署配置和文档。
-- 用户端 Web 使用 Vue 3、TypeScript、Vite 和 chadcn/vue。
+- 用户端 Web 使用 Vue 3、TypeScript、Vite 和 Pinia。
 - 运营后台 Admin 使用 Vue 3、TypeScript、Vite 和 Element Plus。
 - 主业务后端使用 NestJS，负责用户、权限、任务、计费、资产、审核状态和运营后台能力。
 - AI 能力服务使用 FastAPI，负责模型适配、Prompt 处理、媒体处理、供应商回调和 Worker 执行。
@@ -75,8 +75,6 @@ TypeScript
 Vite
 Vue Router
 Pinia
-chadcn/vue
-Tailwind CSS
 ```
 
 主要职责：
@@ -370,7 +368,7 @@ env schema
 
 注意：
 
-- `apps/web` 使用 chadcn/vue。
+- `apps/web` 使用轻量自定义 Vue 组件和 Pinia。
 - `apps/admin` 使用 Element Plus。
 - 两套 UI 的组件风格和目标场景不同，不建议过早抽象大量通用业务组件。
 
