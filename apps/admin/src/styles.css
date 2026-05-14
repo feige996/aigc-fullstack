@@ -1,0 +1,201 @@
+.layout {
+  min-height: 100vh;
+  background: #f6f7f9;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: #f6f7f9;
+}
+
+.login-panel {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 16px;
+}
+
+.login-copy p {
+  margin: 0 0 8px;
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.login-copy h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.aside {
+  color: #fff;
+  background: #1f2937;
+}
+
+.brand {
+  padding: 20px;
+  font-weight: 700;
+}
+
+.header {
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.header p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.main {
+  display: grid;
+  gap: 16px;
+}
+
+.alert {
+  margin-bottom: -4px;
+}
+
+.user-pill {
+  padding: 5px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  color: #374151;
+  background: #f9fafb;
+  font-size: 12px;
+}
+
+.auth-card {
+  width: 100%;
+}
+
+.auth-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.account-card {
+  border-radius: 8px;
+}
+
+.account-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 240px)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.account-form .el-form-item {
+  margin-bottom: 0;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metrics div {
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.metrics span {
+  display: block;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.metrics strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 28px;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(360px, 0.8fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.table-card,
+.detail-card,
+.users-card,
+.projects-card {
+  border-radius: 8px;
+}
+
+.card-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, auto) minmax(
+      150px,
+      auto
+    );
+  gap: 8px;
+  align-items: center;
+}
+
+.table-card .filters,
+.projects-card .filters {
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, auto);
+}
+
+.detail-card h2 {
+  margin: 20px 0 10px;
+  font-size: 16px;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (max-width: 1100px) {
+  .content {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filters,
+  .table-card .filters,
+  .projects-card .filters {
+    grid-template-columns: 1fr;
+  }
+}
