@@ -21,6 +21,8 @@
   },
   "devDependencies": {
     "typescript": "^5.8.3",
+    "unplugin-auto-import": "^21.0.0",
+    "unplugin-vue-components": "^32.0.0",
     "vue-tsc": "^2.2.10"
   }
 }
