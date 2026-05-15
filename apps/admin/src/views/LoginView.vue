@@ -7,9 +7,10 @@ import AuthCard from '../platform/AuthCard.vue'
 const api = useAdminSession()
 const route = useRoute()
 const router = useRouter()
-const phoneNumber = ref('13900139000')
-const password = ref('password123')
+const phoneNumber = ref('')
+const password = ref('')
 const errorMessage = ref('')
+const isLoggingIn = ref(false)
 
 function toErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
@@ -34,9 +35,20 @@ function safeRedirectPath(value: unknown) {
 async function authenticate() {
   errorMessage.value = ''
 
+  if (!phoneNumber.value.trim() || !password.value) {
+    errorMessage.value = '请输入手机号和密码'
+    return
+  }
+
+  if (isLoggingIn.value) {
+    return
+  }
+
+  isLoggingIn.value = true
+
   try {
     await api.authenticate('login', {
-      phoneNumber: phoneNumber.value,
+      phoneNumber: phoneNumber.value.trim(),
       password: password.value,
       displayName: '',
     })
@@ -50,7 +62,9 @@ async function authenticate() {
 
     await router.push(safeRedirectPath(route.query.redirect))
   } catch (error) {
-    errorMessage.value = toErrorMessage(error, 'Login failed')
+    errorMessage.value = toErrorMessage(error, '登录失败')
+  } finally {
+    isLoggingIn.value = false
   }
 }
 </script>
@@ -59,8 +73,8 @@ async function authenticate() {
   <main class="login-page">
     <section class="login-panel">
       <div class="login-copy">
-        <p>AIGC Admin</p>
-        <h1>Sign in to manage generation operations.</h1>
+        <p>智枢运营台</p>
+        <h1>登录后管理生成运营任务</h1>
       </div>
 
       <el-alert
@@ -74,6 +88,7 @@ async function authenticate() {
       <AuthCard
         v-model:phone-number="phoneNumber"
         v-model:password="password"
+        :is-submitting="isLoggingIn"
         @login="authenticate"
       />
     </section>

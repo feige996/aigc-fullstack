@@ -1,4 +1,4 @@
-import { Body, Controller, Get, MessageEvent as NestMessageEvent, Param, Post, Sse } from '@nestjs/common'
+import { Body, Controller, Get, MessageEvent as NestMessageEvent, Param, Post, Query, Sse } from '@nestjs/common'
 import { Observable } from 'rxjs'
 import { CurrentUser } from '../auth/current-user.decorator'
 import { Public } from '../auth/public.decorator'
@@ -32,8 +32,8 @@ export class GenerationController {
 
   @Get('admin')
   @Roles('admin', 'super_admin')
-  listAdminTasks() {
-    return this.generationService.listAdminTasks()
+  listAdminTasks(@Query() query: Record<string, unknown>) {
+    return this.generationService.listAdminTasks(query)
   }
 
   @Sse('events')

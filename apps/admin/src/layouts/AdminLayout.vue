@@ -26,13 +26,13 @@ const activeView = computed<ActiveView>(() => {
 
   return 'tasks'
 })
-const pageTitle = computed(() => String(route.meta.title ?? 'Generation Tasks'))
+const pageTitle = computed(() => String(route.meta.title ?? '任务运营'))
 const pageDescription = computed(() => {
   if (!currentUser.value) {
-    return 'Inspect task state, attempts, and failure signals.'
+    return '查看任务状态、执行尝试和失败信号'
   }
 
-  return `Signed in as ${currentUser.value.phoneNumber}`
+  return `当前账号：${currentUser.value.phoneNumber}`
 })
 
 async function setActiveView(view: ActiveView) {
@@ -48,7 +48,7 @@ async function signOut() {
 <template>
   <el-container class="layout">
     <el-aside width="232px" class="aside">
-      <div class="brand">AIGC Admin</div>
+      <div class="brand">智枢运营台</div>
       <el-menu
         :default-active="activeView"
         background-color="#1f2937"
@@ -56,10 +56,10 @@ async function signOut() {
         active-text-color="#fff"
         @select="(index: string) => setActiveView(index as ActiveView)"
       >
-        <el-menu-item index="tasks">Tasks</el-menu-item>
-        <el-menu-item index="projects">Projects</el-menu-item>
-        <el-menu-item index="users">Users</el-menu-item>
-        <el-menu-item index="account">Account</el-menu-item>
+        <el-menu-item index="tasks">任务</el-menu-item>
+        <el-menu-item index="projects">项目</el-menu-item>
+        <el-menu-item index="users">用户</el-menu-item>
+        <el-menu-item index="account">账号</el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -73,14 +73,14 @@ async function signOut() {
           <span v-if="currentUser" class="user-pill">{{
             currentUser.role
           }}</span>
-          <el-button @click="signOut">Sign Out</el-button>
+          <el-button @click="signOut">退出</el-button>
           <el-button
             v-if="pageActions.refreshHandler.value"
             type="primary"
             :loading="pageActions.refreshLoading.value"
             @click="pageActions.refreshCurrentPage"
           >
-            Refresh
+            刷新
           </el-button>
         </div>
       </el-header>

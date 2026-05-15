@@ -118,6 +118,26 @@ export function useApiClient(apiBaseUrl: string, authStorageKey: string) {
     return request(path, init, false)
   }
 
+  async function readErrorMessage(response: Response, actionName: string) {
+    const fallback = `${actionName} failed: ${response.status}`
+    const contentType = response.headers.get('content-type') ?? ''
+
+    if (contentType.includes('application/json')) {
+      const body = (await response.json().catch(() => null)) as {
+        message?: string | string[]
+        error?: string
+      } | null
+      const message = Array.isArray(body?.message)
+        ? body.message.join(', ')
+        : body?.message
+
+      return message || body?.error || fallback
+    }
+
+    const text = await response.text().catch(() => '')
+    return text || fallback
+  }
+
   async function requestJson<T>(
     path: string,
     init: RequestInit = {},
@@ -126,10 +146,25 @@ export function useApiClient(apiBaseUrl: string, authStorageKey: string) {
     const response = await request(path, init)
 
     if (!response.ok) {
-      throw new Error(`${actionName} failed: ${response.status}`)
+      throw new Error(await readErrorMessage(response, actionName))
     }
 
     return (await response.json()) as T
+  }
+
+  function buildQuery(params: Record<string, string | number | undefined>) {
+    const searchParams = new URLSearchParams()
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === '') {
+        return
+      }
+
+      searchParams.set(key, String(value))
+    })
+
+    const query = searchParams.toString()
+    return query ? `?${query}` : ''
   }
 
   async function authenticate(
@@ -204,6 +239,7 @@ export function useApiClient(apiBaseUrl: string, authStorageKey: string) {
     loadProfile,
     request,
     requestJson,
+    buildQuery,
     signOut,
   }
 }

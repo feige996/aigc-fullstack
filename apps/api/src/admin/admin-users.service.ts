@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
-import type { UserRole, UserStatus } from '@prisma/client'
+import { Prisma, UserRole, UserStatus } from '@prisma/client'
+import { parseEnumFilter, parsePagination, parseSearch, parseSortDirection } from '../common/list-query'
 import { PrismaService } from '../prisma/prisma.service'
 import type { AuthenticatedUser } from '../auth/auth.types'
 
@@ -7,24 +8,48 @@ import type { AuthenticatedUser } from '../auth/auth.types'
 export class AdminUsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listUsers() {
-    const users = await this.prisma.user.findMany({
-      orderBy: {
-        createdAt: 'desc'
-      },
-      select: {
-        id: true,
-        phoneNumber: true,
-        displayName: true,
-        role: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true
-      }
+  async listUsers(query: Record<string, unknown> = {}) {
+    const pagination = parsePagination(query, {
+      defaultPageSize: 20,
+      maxPageSize: 100
     })
+    const search = parseSearch(query.search)
+    const role = parseEnumFilter(query.role, Object.values(UserRole))
+    const status = parseEnumFilter(query.status, Object.values(UserStatus))
+    const sortBy = query.sortBy === 'updatedAt' ? 'updatedAt' : 'createdAt'
+    const sortDirection = parseSortDirection(query.sortDirection)
+    const where: Prisma.UserWhereInput = {
+      ...(role ? { role } : {}),
+      ...(status ? { status } : {}),
+      ...(search
+        ? {
+            OR: [
+              { id: { contains: search } },
+              { phoneNumber: { contains: search } },
+              { displayName: { contains: search } }
+            ]
+          }
+        : {})
+    }
+
+    const [total, users] = await this.prisma.$transaction([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        orderBy: {
+          [sortBy]: sortDirection
+        },
+        skip: pagination.skip,
+        take: pagination.take,
+        select: this.userSelect()
+      })
+    ])
 
     return {
-      items: users
+      items: users,
+      total,
+      page: pagination.page,
+      pageSize: pagination.pageSize
     }
   }
 

@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAdminPageActions } from '../composables/useAdminPageActions'
 import { useAdminSession } from '../composables/useAdminSession'
 import ProjectManagement from '../platform/ProjectManagement.vue'
-import type { Project } from '../types'
+import type { ListResponse, Project } from '../types'
 
 const api = useAdminSession()
 const pageActions = useAdminPageActions()
 const projects = ref<Project[]>([])
+const totalProjects = ref(0)
+const page = ref(1)
+const pageSize = ref(20)
+const searchQuery = ref('')
+const statusFilter = ref<string>('all')
 const isLoadingProjects = ref(false)
 
 function toErrorMessage(error: unknown, fallback: string) {
@@ -19,18 +24,45 @@ async function loadProjects() {
   isLoadingProjects.value = true
 
   try {
-    const result = await api.requestJson<{ items: Project[] }>(
-      '/projects',
+    const result = await api.requestJson<ListResponse<Project>>(
+      `/projects${api.buildQuery({
+        page: page.value,
+        pageSize: pageSize.value,
+        search: searchQuery.value.trim(),
+        status: statusFilter.value === 'all' ? undefined : statusFilter.value,
+      })}`,
       {},
       'Load projects',
     )
     projects.value = result.items
+    totalProjects.value = result.total
   } catch (error) {
     ElMessage.error(toErrorMessage(error, 'Load projects failed'))
   } finally {
     isLoadingProjects.value = false
   }
 }
+
+function updatePage(nextPage: number) {
+  page.value = nextPage
+  loadProjects()
+}
+
+function updatePageSize(nextPageSize: number) {
+  pageSize.value = nextPageSize
+  page.value = 1
+  loadProjects()
+}
+
+let searchTimer: number | undefined
+
+watch([searchQuery, statusFilter], () => {
+  page.value = 1
+  window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(() => {
+    loadProjects()
+  }, 250)
+})
 
 onMounted(() => {
   pageActions.setRefreshAction(loadProjects, isLoadingProjects)
@@ -45,6 +77,13 @@ onUnmounted(() => {
 <template>
   <ProjectManagement
     :projects="projects"
+    :total-projects="totalProjects"
+    :page="page"
+    :page-size="pageSize"
+    v-model:search-query="searchQuery"
+    v-model:status-filter="statusFilter"
     :is-loading-projects="isLoadingProjects"
+    @update-page="updatePage"
+    @update-page-size="updatePageSize"
   />
 </template>

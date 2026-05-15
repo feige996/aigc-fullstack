@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import type { TaskRequestMessage } from '@aigc/shared-contracts'
 import { randomUUID } from 'node:crypto'
+import { Prisma, TaskStatus } from '@prisma/client'
+import { parseEnumFilter, parsePagination, parseSearch, parseSortDirection } from '../common/list-query'
 import { PrismaService } from '../prisma/prisma.service'
 import { GenerationEventsService } from './generation-events.service'
 import { GenerationPublisherService } from './generation-publisher.service'
@@ -240,19 +242,51 @@ export class GenerationService {
     }
   }
 
-  async listAdminTasks() {
-    const tasks = await this.prisma.task.findMany({
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: 50,
-      include: {
-        currentAttempt: true
-      }
+  async listAdminTasks(query: Record<string, unknown> = {}) {
+    const pagination = parsePagination(query, {
+      defaultPageSize: 20,
+      maxPageSize: 100
     })
+    const search = parseSearch(query.search)
+    const status = parseEnumFilter(query.status, Object.values(TaskStatus))
+    const sortBy = query.sortBy === 'updatedAt' ? 'updatedAt' : 'createdAt'
+    const sortDirection = parseSortDirection(query.sortDirection)
+    const where: Prisma.TaskWhereInput = {
+      ...(status ? { status } : {}),
+      ...(search
+        ? {
+            OR: [
+              { id: { contains: search } },
+              { userId: { contains: search } },
+              { projectId: { contains: search } },
+              { type: { contains: search } },
+              { model: { contains: search } },
+              { stage: { contains: search } }
+            ]
+          }
+        : {})
+    }
+
+    const [total, tasks] = await this.prisma.$transaction([
+      this.prisma.task.count({ where }),
+      this.prisma.task.findMany({
+        where,
+        orderBy: {
+          [sortBy]: sortDirection
+        },
+        skip: pagination.skip,
+        take: pagination.take,
+        include: {
+          currentAttempt: true
+        }
+      })
+    ])
 
     return {
-      items: tasks.map((task) => serializeTask(task))
+      items: tasks.map((task) => serializeTask(task)),
+      total,
+      page: pagination.page,
+      pageSize: pagination.pageSize
     }
   }
 

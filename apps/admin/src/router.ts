@@ -31,7 +31,7 @@ export const router = createRouter({
           name: 'tasks',
           component: TasksView,
           meta: {
-            title: 'Generation Tasks',
+            title: '任务运营',
           },
         },
         {
@@ -39,7 +39,7 @@ export const router = createRouter({
           name: 'projects',
           component: ProjectsView,
           meta: {
-            title: 'Projects',
+            title: '项目管理',
           },
         },
         {
@@ -47,7 +47,7 @@ export const router = createRouter({
           name: 'users',
           component: UsersView,
           meta: {
-            title: 'Users',
+            title: '用户管理',
           },
         },
         {
@@ -55,7 +55,7 @@ export const router = createRouter({
           name: 'account',
           component: AccountView,
           meta: {
-            title: 'Account',
+            title: '账号设置',
           },
         },
       ],

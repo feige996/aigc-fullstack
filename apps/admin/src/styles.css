@@ -4,9 +4,14 @@ body {
   padding: 0;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 .layout {
   min-height: 100vh;
   background: #f6f7f9;
+  min-width: 0;
 }
 
 .login-page {
@@ -47,10 +52,11 @@ body {
 }
 
 .header {
-  height: 76px;
+  min-height: 76px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   background: #fff;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -58,6 +64,8 @@ body {
 .header-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -74,6 +82,7 @@ body {
 .main {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .alert {
@@ -96,6 +105,10 @@ body {
 .auth-actions {
   display: flex;
   gap: 8px;
+}
+
+.auth-actions .el-button {
+  width: 100%;
 }
 
 .account-card {
@@ -185,6 +198,12 @@ body {
   justify-content: space-between;
 }
 
+.table-pagination {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 14px;
+}
+
 @media (max-width: 1100px) {
   .content {
     grid-template-columns: 1fr;
@@ -203,5 +222,76 @@ body {
   .table-card .filters,
   .projects-card .filters {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .layout {
+    display: block;
+  }
+
+  .aside {
+    width: 100% !important;
+  }
+
+  .brand {
+    padding: 14px 16px;
+  }
+
+  .aside .el-menu {
+    display: flex;
+    overflow-x: auto;
+    border-right: 0;
+  }
+
+  .aside .el-menu-item {
+    flex: 0 0 auto;
+  }
+
+  .header {
+    height: auto;
+    padding: 14px 16px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .main {
+    padding: 16px;
+  }
+
+  .login-page {
+    padding: 20px;
+  }
+
+  .login-copy h1 {
+    font-size: 24px;
+  }
+
+  .account-form {
+    grid-template-columns: 1fr;
+  }
+
+  .account-form .el-button {
+    width: 100%;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .card-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filters .el-input,
+  .filters .el-select,
+  .filters .el-button {
+    width: 100%;
   }
 }

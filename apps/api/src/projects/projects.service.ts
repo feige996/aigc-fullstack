@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { Prisma, ProjectStatus } from '@prisma/client'
+import { parseEnumFilter, parsePagination, parseSearch, parseSortDirection } from '../common/list-query'
 import type { AuthenticatedUser } from '../auth/auth.types'
 import { PrismaService } from '../prisma/prisma.service'
 import type { CreateProjectDto } from './dto/create-project.dto'
@@ -37,30 +38,69 @@ export class ProjectsService {
     }
   }
 
-  async listProjects(user: AuthenticatedUser) {
-    const projects = await this.prisma.project.findMany({
-      where: this.projectAccessWhere(user),
-      orderBy: {
-        createdAt: 'desc'
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            phoneNumber: true,
-            displayName: true
+  async listProjects(user: AuthenticatedUser, query: Record<string, unknown> = {}) {
+    const pagination = parsePagination(query, {
+      defaultPageSize: 20,
+      maxPageSize: 100
+    })
+    const search = parseSearch(query.search)
+    const status = parseEnumFilter(query.status, Object.values(ProjectStatus))
+    const sortBy = query.sortBy === 'updatedAt' ? 'updatedAt' : 'createdAt'
+    const sortDirection = parseSortDirection(query.sortDirection)
+    const where: Prisma.ProjectWhereInput = {
+      ...this.projectAccessWhere(user),
+      ...(status ? { status } : {}),
+      ...(search
+        ? {
+            OR: [
+              { id: { contains: search } },
+              { userId: { contains: search } },
+              { name: { contains: search } },
+              { description: { contains: search } },
+              {
+                user: {
+                  OR: [
+                    { phoneNumber: { contains: search } },
+                    { displayName: { contains: search } }
+                  ]
+                }
+              }
+            ]
           }
+        : {})
+    }
+
+    const [total, projects] = await this.prisma.$transaction([
+      this.prisma.project.count({ where }),
+      this.prisma.project.findMany({
+        where,
+        orderBy: {
+          [sortBy]: sortDirection
         },
-        _count: {
-          select: {
-            tasks: true
+        skip: pagination.skip,
+        take: pagination.take,
+        include: {
+          user: {
+            select: {
+              id: true,
+              phoneNumber: true,
+              displayName: true
+            }
+          },
+          _count: {
+            select: {
+              tasks: true
+            }
           }
         }
-      }
-    })
+      })
+    ])
 
     return {
-      items: projects.map((project) => this.serializeProject(project))
+      items: projects.map((project) => this.serializeProject(project)),
+      total,
+      page: pagination.page,
+      pageSize: pagination.pageSize
     }
   }
 

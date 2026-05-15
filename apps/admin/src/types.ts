@@ -16,6 +16,13 @@ export type UserRole = 'user' | 'admin' | 'super_admin'
 export type UserStatus = 'active' | 'disabled'
 export type ActiveView = 'tasks' | 'users' | 'projects' | 'account'
 
+export interface ListResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 export interface GenerationAttempt {
   id: string
   attemptNo: number

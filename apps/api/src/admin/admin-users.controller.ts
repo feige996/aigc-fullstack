@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common'
 import { CurrentUser } from '../auth/current-user.decorator'
 import { Roles } from '../auth/roles.decorator'
 import type { AuthenticatedUser } from '../auth/auth.types'
@@ -12,8 +12,8 @@ export class AdminUsersController {
   constructor(private readonly adminUsersService: AdminUsersService) {}
 
   @Get()
-  listUsers() {
-    return this.adminUsersService.listUsers()
+  listUsers(@Query() query: Record<string, unknown>) {
+    return this.adminUsersService.listUsers(query)
   }
 
   @Patch(':userId/status')

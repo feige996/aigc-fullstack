@@ -1,20 +1,26 @@
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import TaskDashboard from '../features/aigc-generation/TaskDashboard.vue'
 import { useAdminPageActions } from '../composables/useAdminPageActions'
 import { useAdminSession } from '../composables/useAdminSession'
-import type { Asset, Task, TaskStatus } from '../types'
+import type { Asset, ListResponse, Task, TaskStatus } from '../types'
+
+type TaskStatusFilter = TaskStatus | 'all'
 
 const api = useAdminSession()
 const pageActions = useAdminPageActions()
 const tasks = ref<Task[]>([])
 const selectedTask = ref<Task | null>(null)
+const totalTasks = ref(0)
+const page = ref(1)
+const pageSize = ref(20)
+const searchQuery = ref('')
+const statusFilter = ref<TaskStatusFilter>('all')
 const isLoading = ref(false)
 const isRetrying = ref(false)
 const isCanceling = ref(false)
 
-const totalTasks = computed(() => tasks.value.length)
 const failedTasks = computed(
   () =>
     tasks.value.filter(
@@ -23,6 +29,22 @@ const failedTasks = computed(
 )
 const succeededTasks = computed(
   () => tasks.value.filter((task) => task.status === 'succeeded').length,
+)
+const runningTasks = computed(
+  () =>
+    tasks.value.filter(
+      (task) => task.status === 'running' || task.status === 'retrying',
+    ).length,
+)
+const pendingTasks = computed(
+  () =>
+    tasks.value.filter(
+      (task) =>
+        task.status === 'draft' ||
+        task.status === 'validating' ||
+        task.status === 'pending' ||
+        task.status === 'queued',
+    ).length,
 )
 
 function toErrorMessage(error: unknown, fallback: string) {
@@ -37,15 +59,29 @@ async function loadTasks() {
   isLoading.value = true
 
   try {
-    const result = await api.requestJson<{ items: Task[] }>(
-      '/generation/tasks/admin',
+    const result = await api.requestJson<ListResponse<Task>>(
+      `/generation/tasks/admin${api.buildQuery({
+        page: page.value,
+        pageSize: pageSize.value,
+        search: searchQuery.value.trim(),
+        status: statusFilter.value === 'all' ? undefined : statusFilter.value,
+      })}`,
       {},
       'Load tasks',
     )
     tasks.value = result.items
+    totalTasks.value = result.total
 
-    if (!selectedTask.value && result.items[0]) {
+    const selectedListTask = selectedTask.value
+      ? result.items.find((task) => task.taskId === selectedTask.value?.taskId)
+      : null
+
+    if (selectedListTask) {
+      await selectTask(selectedListTask)
+    } else if (result.items[0]) {
       await selectTask(result.items[0])
+    } else {
+      selectedTask.value = null
     }
   } catch (error) {
     showError(error, 'Load tasks failed')
@@ -53,6 +89,27 @@ async function loadTasks() {
     isLoading.value = false
   }
 }
+
+function updatePage(nextPage: number) {
+  page.value = nextPage
+  loadTasks()
+}
+
+function updatePageSize(nextPageSize: number) {
+  pageSize.value = nextPageSize
+  page.value = 1
+  loadTasks()
+}
+
+let searchTimer: number | undefined
+
+watch([searchQuery, statusFilter], () => {
+  page.value = 1
+  window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(() => {
+    loadTasks()
+  }, 250)
+})
 
 async function selectTask(task: Task) {
   const response = await api.request(`/generation/tasks/${task.taskId}`)
@@ -67,6 +124,20 @@ async function selectTask(task: Task) {
 
 async function retrySelectedTask() {
   if (!selectedTask.value) {
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `Retry task ${selectedTask.value.taskId}?`,
+      'Confirm Retry',
+      {
+        confirmButtonText: 'Retry',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      },
+    )
+  } catch {
     return
   }
 
@@ -95,6 +166,21 @@ async function retrySelectedTask() {
 
 async function cancelSelectedTask() {
   if (!selectedTask.value) {
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `Cancel task ${selectedTask.value.taskId}? This operation may stop active generation.`,
+      'Confirm Cancel',
+      {
+        confirmButtonText: 'Cancel Task',
+        cancelButtonText: 'Keep Task',
+        confirmButtonClass: 'el-button--danger',
+        type: 'warning',
+      },
+    )
+  } catch {
     return
   }
 
@@ -192,15 +278,25 @@ onUnmounted(() => {
     :total-tasks="totalTasks"
     :succeeded-tasks="succeededTasks"
     :failed-tasks="failedTasks"
+    :running-tasks="runningTasks"
+    :pending-tasks="pendingTasks"
+    :search-query="searchQuery"
+    :status-filter="statusFilter"
+    :page="page"
+    :page-size="pageSize"
     :is-loading="isLoading"
     :is-retrying="isRetrying"
     :is-canceling="isCanceling"
     :can-retry="canRetry"
     :can-cancel="canCancel"
     :status-type="statusType"
+    @update:search-query="searchQuery = $event"
+    @update:status-filter="statusFilter = $event"
     @select-task="selectTask"
     @retry-selected-task="retrySelectedTask"
     @cancel-selected-task="cancelSelectedTask"
     @download-asset="downloadAsset"
+    @update-page="updatePage"
+    @update-page-size="updatePageSize"
   />
 </template>

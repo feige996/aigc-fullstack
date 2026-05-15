@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common'
 import { CurrentUser } from '../auth/current-user.decorator'
 import type { AuthenticatedUser } from '../auth/auth.types'
 import { CreateProjectDto } from './dto/create-project.dto'
@@ -14,8 +14,8 @@ export class ProjectsController {
   }
 
   @Get()
-  listProjects(@CurrentUser() user: AuthenticatedUser) {
-    return this.projectsService.listProjects(user)
+  listProjects(@CurrentUser() user: AuthenticatedUser, @Query() query: Record<string, unknown>) {
+    return this.projectsService.listProjects(user, query)
   }
 
   @Get(':projectId')

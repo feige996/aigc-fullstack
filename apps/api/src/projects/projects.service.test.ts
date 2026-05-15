@@ -36,13 +36,19 @@ function mockFn(): MockFn {
 }
 
 function createMockPrisma() {
-  return {
+  const prisma = {
     project: {
+      count: mockFn(),
       create: mockFn(),
       findFirst: mockFn(),
       findMany: mockFn()
-    }
+    },
+    $transaction: mockFn()
   }
+
+  prisma.$transaction.mock.mockImplementationOnce(async (operations: Array<Promise<unknown>>) => Promise.all(operations))
+
+  return prisma
 }
 
 function createProject(overrides: Record<string, unknown> = {}) {
@@ -142,11 +148,15 @@ test('listProjects scopes regular users to their own projects', async () => {
   const prisma = createMockPrisma()
   const service = new ProjectsService(prisma as never)
 
+  prisma.project.count.mock.mockImplementationOnce(async () => 1)
   prisma.project.findMany.mock.mockImplementationOnce(async () => [createProject()])
 
   const result = await service.listProjects(regularUser)
 
   assert.equal(result.items.length, 1)
+  assert.equal(result.total, 1)
+  assert.equal(result.page, 1)
+  assert.equal(result.pageSize, 20)
   assert.deepEqual(prisma.project.findMany.mock.calls[0]?.arguments[0].where, {
     userId: 'user_1'
   })
@@ -159,6 +169,7 @@ test('listProjects allows admins to see all projects', async () => {
   const prisma = createMockPrisma()
   const service = new ProjectsService(prisma as never)
 
+  prisma.project.count.mock.mockImplementationOnce(async () => 1)
   prisma.project.findMany.mock.mockImplementationOnce(async () => [createProject()])
 
   await service.listProjects(adminUser)
