@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { adminProjectsApi } from '../api'
 import { useAdminPageActions } from '../composables/useAdminPageActions'
-import { useAdminSession } from '../composables/useAdminSession'
 import ProjectManagement from '../platform/ProjectManagement.vue'
-import type { ListResponse, Project } from '../types'
+import type { Project } from '../types'
 
-const api = useAdminSession()
 const pageActions = useAdminPageActions()
 const projects = ref<Project[]>([])
 const totalProjects = ref(0)
@@ -24,16 +23,12 @@ async function loadProjects() {
   isLoadingProjects.value = true
 
   try {
-    const result = await api.requestJson<ListResponse<Project>>(
-      `/projects${api.buildQuery({
+    const result = await adminProjectsApi.list({
         page: page.value,
         pageSize: pageSize.value,
         search: searchQuery.value.trim(),
         status: statusFilter.value === 'all' ? undefined : statusFilter.value,
-      })}`,
-      {},
-      'Load projects',
-    )
+      })
     projects.value = result.items
     totalProjects.value = result.total
   } catch (error) {

@@ -2,6 +2,7 @@
 import { ElMessage } from 'element-plus'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { adminAuthApi } from '../api'
 import { useAdminSession } from '../composables/useAdminSession'
 import AccountCard from '../platform/AccountCard.vue'
 
@@ -19,20 +20,7 @@ async function changePassword() {
   isChangingPassword.value = true
 
   try {
-    await api.requestJson(
-      '/auth/change-password',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          currentPassword: currentPassword.value,
-          newPassword: newPassword.value,
-        }),
-      },
-      'Change password',
-    )
+    await adminAuthApi.changePassword(currentPassword.value, newPassword.value)
 
     currentPassword.value = ''
     newPassword.value = ''

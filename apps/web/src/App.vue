@@ -5,19 +5,15 @@ import AccountPanel from './platform/AccountPanel.vue';
 import AssetPanel from './platform/AssetPanel.vue';
 import AuthPanel from './platform/AuthPanel.vue';
 import ProjectPanel from './platform/ProjectPanel.vue';
+import { createWebApi } from './api';
 import { useApiClient } from './composables/useApiClient';
-import type {
-  Asset,
-  CreateAssetUploadResponse,
-  CreateTaskResponse,
-  Task,
-  Project,
-} from './types';
+import type { Asset, Task, Project } from './types';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
 
 const authStorageKey = 'aigc.web.auth';
 const api = useApiClient(apiBaseUrl, authStorageKey);
+const webApi = createWebApi(api, apiBaseUrl);
 const phoneNumber = ref('13900139000');
 const password = ref('password123');
 const displayName = ref('Demo User');
@@ -99,17 +95,11 @@ async function loadProjects() {
     return;
   }
 
-  const response = await api.request('/projects');
+  const items = await webApi.projects.list();
+  projects.value = items;
 
-  if (!response.ok) {
-    return;
-  }
-
-  const result = (await response.json()) as { items: Project[] };
-  projects.value = result.items;
-
-  if (!selectedProjectId.value && result.items[0]) {
-    selectedProjectId.value = result.items[0].projectId;
+  if (!selectedProjectId.value && items[0]) {
+    selectedProjectId.value = items[0].projectId;
   }
 }
 
@@ -118,20 +108,10 @@ async function createProject() {
   isCreatingProject.value = true;
 
   try {
-    const project = await api.requestJson<Project>(
-      '/projects',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: projectName.value,
-          description: projectDescription.value,
-        }),
-      },
-      'Create project',
-    );
+    const project = await webApi.projects.create({
+      name: projectName.value,
+      description: projectDescription.value,
+    });
     projects.value = [project, ...projects.value];
     selectedProjectId.value = project.projectId;
     projectName.value = '';
@@ -149,14 +129,7 @@ async function loadAssets() {
     return;
   }
 
-  const response = await api.request('/assets');
-
-  if (!response.ok) {
-    return;
-  }
-
-  const result = (await response.json()) as { items: Asset[] };
-  assets.value = result.items;
+  assets.value = await webApi.assets.list();
 }
 
 async function uploadAsset(event: Event) {
@@ -171,23 +144,12 @@ async function uploadAsset(event: Event) {
   isUploadingAsset.value = true;
 
   try {
-    const uploadInfo = await api.requestJson<CreateAssetUploadResponse>(
-      '/assets/uploads',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'user_upload',
-          fileName: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          size: file.size,
-          projectId: selectedProjectId.value || undefined,
-        }),
-      },
-      'Create upload',
-    );
+    const uploadInfo = await webApi.assets.createUpload({
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      size: file.size,
+      projectId: selectedProjectId.value || undefined,
+    });
     const putResponse = await fetch(uploadInfo.upload.url, {
       method: uploadInfo.upload.method,
       headers: uploadInfo.upload.headers,
@@ -198,18 +160,9 @@ async function uploadAsset(event: Event) {
       throw new Error(`Upload failed: ${putResponse.status}`);
     }
 
-    const asset = await api.requestJson<Asset>(
-      `/assets/${uploadInfo.asset.assetId}/confirm`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          size: file.size,
-        }),
-      },
-      'Confirm upload',
+    const asset = await webApi.assets.confirmUpload(
+      uploadInfo.asset.assetId,
+      file.size,
     );
     assets.value = [asset, ...assets.value.filter((item) => item.assetId !== asset.assetId)];
     selectedAssetIds.value = Array.from(new Set([asset.assetId, ...selectedAssetIds.value]));
@@ -226,13 +179,7 @@ async function downloadAsset(asset: Asset) {
   resetMessages();
 
   try {
-    const result = await api.requestJson<{ url: string }>(
-      `/assets/${asset.assetId}/download`,
-      {
-        method: 'POST',
-      },
-      'Create download',
-    );
+    const result = await webApi.assets.createDownload(asset.assetId);
     window.open(result.url, '_blank', 'noopener');
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'Create download failed');
@@ -244,24 +191,14 @@ async function createTask() {
   isSubmitting.value = true;
 
   try {
-    const result = await api.requestJson<CreateTaskResponse>(
-      '/generation/tasks',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projectId: selectedProjectId.value || undefined,
-          type: 'text_to_image',
-          model: 'mock-image-v1',
-          prompt: prompt.value,
-          ratio: ratio.value,
-          referenceAssetIds: selectedAssetIds.value,
-        }),
-      },
-      'Create task',
-    );
+    const result = await webApi.generationTasks.create({
+      projectId: selectedProjectId.value || undefined,
+      type: 'text_to_image',
+      model: 'mock-image-v1',
+      prompt: prompt.value,
+      ratio: ratio.value,
+      referenceAssetIds: selectedAssetIds.value,
+    });
     activeTaskId.value = result.taskId;
     await refreshActiveTask();
     await loadTasks();
@@ -281,11 +218,7 @@ async function refreshActiveTask() {
   isRefreshing.value = true;
 
   try {
-    activeTask.value = await api.requestJson<Task>(
-      `/generation/tasks/${activeTaskId.value}`,
-      {},
-      'Fetch task',
-    );
+    activeTask.value = await webApi.generationTasks.get(activeTaskId.value);
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'Fetch task failed');
   } finally {
@@ -302,13 +235,7 @@ async function cancelActiveTask() {
   isCanceling.value = true;
 
   try {
-    await api.requestJson(
-      `/generation/tasks/${activeTaskId.value}/cancel`,
-      {
-        method: 'POST',
-      },
-      'Cancel task',
-    );
+    await webApi.generationTasks.cancel(activeTaskId.value);
     await refreshActiveTask();
     await loadTasks();
   } catch (error) {
@@ -323,19 +250,9 @@ async function changePassword() {
   isChangingPassword.value = true;
 
   try {
-    await api.requestJson(
-      '/auth/change-password',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          currentPassword: currentPassword.value,
-          newPassword: newPassword.value,
-        }),
-      },
-      'Change password',
+    await webApi.auth.changePassword(
+      currentPassword.value,
+      newPassword.value,
     );
 
     currentPassword.value = '';
@@ -354,14 +271,7 @@ async function loadTasks() {
     return;
   }
 
-  const response = await api.request('/generation/tasks');
-
-  if (!response.ok) {
-    return;
-  }
-
-  const result = (await response.json()) as { items: Task[] };
-  tasks.value = result.items;
+  tasks.value = await webApi.generationTasks.list();
 }
 
 function selectTask(task: Task) {
@@ -377,7 +287,7 @@ function connectEvents() {
   eventSource?.close();
   eventSourceStatus.value = 'connecting';
   eventSource = new EventSource(
-    `${apiBaseUrl}/generation/tasks/events?access_token=${encodeURIComponent(api.accessToken.value)}`,
+    webApi.generationTasks.eventsUrl(api.accessToken.value),
   );
 
   eventSource.onopen = () => {

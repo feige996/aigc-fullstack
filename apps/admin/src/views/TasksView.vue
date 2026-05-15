@@ -2,13 +2,12 @@
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import TaskDashboard from '../features/aigc-generation/TaskDashboard.vue'
+import { adminAssetsApi, adminGenerationTasksApi } from '../api'
 import { useAdminPageActions } from '../composables/useAdminPageActions'
-import { useAdminSession } from '../composables/useAdminSession'
-import type { Asset, ListResponse, Task, TaskStatus } from '../types'
+import type { Asset, Task, TaskStatus } from '../types'
 
 type TaskStatusFilter = TaskStatus | 'all'
 
-const api = useAdminSession()
 const pageActions = useAdminPageActions()
 const tasks = ref<Task[]>([])
 const selectedTask = ref<Task | null>(null)
@@ -59,16 +58,12 @@ async function loadTasks() {
   isLoading.value = true
 
   try {
-    const result = await api.requestJson<ListResponse<Task>>(
-      `/generation/tasks/admin${api.buildQuery({
+    const result = await adminGenerationTasksApi.listAdmin({
         page: page.value,
         pageSize: pageSize.value,
         search: searchQuery.value.trim(),
         status: statusFilter.value === 'all' ? undefined : statusFilter.value,
-      })}`,
-      {},
-      'Load tasks',
-    )
+      })
     tasks.value = result.items
     totalTasks.value = result.total
 
@@ -112,14 +107,11 @@ watch([searchQuery, statusFilter], () => {
 })
 
 async function selectTask(task: Task) {
-  const response = await api.request(`/generation/tasks/${task.taskId}`)
-
-  if (!response.ok) {
+  try {
+    selectedTask.value = await adminGenerationTasksApi.get(task.taskId)
+  } catch {
     selectedTask.value = task
-    return
   }
-
-  selectedTask.value = (await response.json()) as Task
 }
 
 async function retrySelectedTask() {
@@ -144,13 +136,7 @@ async function retrySelectedTask() {
   isRetrying.value = true
 
   try {
-    const retried = await api.requestJson<{ taskId: string }>(
-      `/generation/tasks/${selectedTask.value.taskId}/retry`,
-      {
-        method: 'POST',
-      },
-      'Retry task',
-    )
+    const retried = await adminGenerationTasksApi.retry(selectedTask.value.taskId)
     await loadTasks()
     const task = tasks.value.find((item) => item.taskId === retried.taskId)
 
@@ -187,13 +173,7 @@ async function cancelSelectedTask() {
   isCanceling.value = true
 
   try {
-    const canceled = await api.requestJson<{ taskId: string }>(
-      `/generation/tasks/${selectedTask.value.taskId}/cancel`,
-      {
-        method: 'POST',
-      },
-      'Cancel task',
-    )
+    const canceled = await adminGenerationTasksApi.cancel(selectedTask.value.taskId)
     await loadTasks()
     const task = tasks.value.find((item) => item.taskId === canceled.taskId)
 
@@ -209,13 +189,7 @@ async function cancelSelectedTask() {
 
 async function downloadAsset(asset: Asset) {
   try {
-    const result = await api.requestJson<{ url: string }>(
-      `/assets/${asset.assetId}/download`,
-      {
-        method: 'POST',
-      },
-      'Create download',
-    )
+    const result = await adminAssetsApi.createDownload(asset.assetId)
     window.open(result.url, '_blank', 'noopener')
   } catch (error) {
     showError(error, 'Create download failed')

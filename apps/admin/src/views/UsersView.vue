@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { adminUsersApi } from '../api'
 import { useAdminPageActions } from '../composables/useAdminPageActions'
 import { useAdminSession } from '../composables/useAdminSession'
 import UserManagement from '../platform/UserManagement.vue'
-import type { AdminUser, ListResponse, UserRole, UserStatus } from '../types'
+import type { AdminUser, UserRole, UserStatus } from '../types'
 
 const api = useAdminSession()
 const pageActions = useAdminPageActions()
@@ -28,17 +29,13 @@ async function loadUsers() {
   isLoadingUsers.value = true
 
   try {
-    const result = await api.requestJson<ListResponse<AdminUser>>(
-      `/admin/users${api.buildQuery({
+    const result = await adminUsersApi.list({
         page: page.value,
         pageSize: pageSize.value,
         search: searchQuery.value.trim(),
         role: roleFilter.value === 'all' ? undefined : roleFilter.value,
         status: statusFilter.value === 'all' ? undefined : statusFilter.value,
-      })}`,
-      {},
-      'Load users',
-    )
+      })
     users.value = result.items
     totalUsers.value = result.total
   } catch (error) {
@@ -64,9 +61,7 @@ async function updateUserStatus(user: AdminUser, status: UserStatus) {
     return
   }
 
-  await updateUser(user.id, `/admin/users/${user.id}/status`, {
-    status,
-  })
+  await updateUser(user.id, () => adminUsersApi.updateStatus(user.id, status))
 }
 
 async function updateUserRole(user: AdminUser, role: UserRole) {
@@ -84,30 +79,17 @@ async function updateUserRole(user: AdminUser, role: UserRole) {
     return
   }
 
-  await updateUser(user.id, `/admin/users/${user.id}/role`, {
-    role,
-  })
+  await updateUser(user.id, () => adminUsersApi.updateRole(user.id, role))
 }
 
 async function updateUser(
   userId: string,
-  path: string,
-  body: Record<string, string>,
+  requestUpdate: () => Promise<AdminUser>,
 ) {
   updatingUserIds.value = new Set(updatingUserIds.value).add(userId)
 
   try {
-    const updatedUser = await api.requestJson<AdminUser>(
-      path,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      },
-      'Update user',
-    )
+    const updatedUser = await requestUpdate()
     users.value = users.value.map((user) =>
       user.id === updatedUser.id ? updatedUser : user,
     )
