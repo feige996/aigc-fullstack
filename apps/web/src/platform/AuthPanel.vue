@@ -19,32 +19,35 @@ defineEmits<{
 <template>
   <section class="panel auth-panel">
     <label>
-      Phone
+      手机号
       <input
         :value="phoneNumber"
         type="tel"
+        autocomplete="username"
         @input="$emit('update:phoneNumber', ($event.target as HTMLInputElement).value)"
       />
     </label>
     <label>
-      Password
+      密码
       <input
         :value="password"
         type="password"
+        autocomplete="current-password"
         @input="$emit('update:password', ($event.target as HTMLInputElement).value)"
       />
     </label>
     <label>
-      Display Name
+      显示名称
       <input
         :value="displayName"
         type="text"
+        autocomplete="name"
         @input="$emit('update:displayName', ($event.target as HTMLInputElement).value)"
       />
     </label>
     <div class="controls">
-      <button type="button" @click="$emit('login')">Login</button>
-      <button type="button" @click="$emit('register')">Register</button>
+      <button type="button" @click="$emit('login')">登录</button>
+      <button type="button" class="secondary-button" @click="$emit('register')">注册</button>
     </div>
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     <p v-if="successMessage" class="success">{{ successMessage }}</p>

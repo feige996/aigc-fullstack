@@ -15,25 +15,27 @@ defineEmits<{
 
 <template>
   <section class="panel account-panel">
-    <h2>Account</h2>
+    <h2>账号安全</h2>
     <label>
-      Current Password
+      当前密码
       <input
         :value="currentPassword"
         type="password"
+        autocomplete="current-password"
         @input="$emit('update:currentPassword', ($event.target as HTMLInputElement).value)"
       />
     </label>
     <label>
-      New Password
+      新密码
       <input
         :value="newPassword"
         type="password"
+        autocomplete="new-password"
         @input="$emit('update:newPassword', ($event.target as HTMLInputElement).value)"
       />
     </label>
     <button type="button" :disabled="isChangingPassword" @click="$emit('changePassword')">
-      {{ isChangingPassword ? 'Changing...' : 'Change Password' }}
+      {{ isChangingPassword ? '修改中...' : '修改密码' }}
     </button>
     <p v-if="successMessage" class="success">{{ successMessage }}</p>
   </section>

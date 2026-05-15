@@ -26,17 +26,18 @@ defineEmits<{
 
 <template>
   <section class="panel">
-    <label for="prompt">Prompt</label>
+    <label for="prompt">生成提示词</label>
     <textarea
       id="prompt"
       :value="prompt"
       rows="5"
+      placeholder="描述你想生成的画面，例如：一张干净的陶瓷杯产品摄影，柔和自然光，白色背景"
       @input="$emit('update:prompt', ($event.target as HTMLTextAreaElement).value)"
     />
 
     <div class="controls">
       <label>
-        Ratio
+        画幅比例
         <select
           :value="ratio"
           @change="$emit('update:ratio', ($event.target as HTMLSelectElement).value)"
@@ -48,19 +49,19 @@ defineEmits<{
       </label>
 
       <button type="button" :disabled="isSubmitting" @click="$emit('createTask')">
-        {{ isSubmitting ? 'Submitting...' : 'Submit Task' }}
+        {{ isSubmitting ? '提交中...' : '提交任务' }}
       </button>
     </div>
   </section>
 
   <section class="panel result">
     <div class="result-header">
-      <h2>Current Task</h2>
+      <h2>当前任务</h2>
       <button type="button" :disabled="!activeTaskId || isRefreshing" @click="$emit('refreshActiveTask')">
-        {{ isRefreshing ? 'Refreshing...' : 'Refresh' }}
+        {{ isRefreshing ? '刷新中...' : '刷新' }}
       </button>
       <button type="button" :disabled="!activeTaskId || isCanceling" @click="$emit('cancelActiveTask')">
-        {{ isCanceling ? 'Canceling...' : 'Cancel' }}
+        {{ isCanceling ? '取消中...' : '取消' }}
       </button>
     </div>
 
@@ -69,36 +70,36 @@ defineEmits<{
     <template v-if="activeTask">
       <dl>
         <div>
-          <dt>Task ID</dt>
+          <dt>任务 ID</dt>
           <dd>{{ activeTask.taskId }}</dd>
         </div>
         <div>
-          <dt>Project ID</dt>
-          <dd>{{ activeTask.projectId ?? 'none' }}</dd>
+          <dt>项目 ID</dt>
+          <dd>{{ activeTask.projectId ?? '未绑定' }}</dd>
         </div>
         <div>
-          <dt>Assets</dt>
-          <dd>{{ activeTask.inputPayload.referenceAssetIds?.join(', ') || 'none' }}</dd>
+          <dt>素材</dt>
+          <dd>{{ activeTask.inputPayload.referenceAssetIds?.join(', ') || '无' }}</dd>
         </div>
         <div>
-          <dt>Status</dt>
+          <dt>状态</dt>
           <dd>{{ activeTask.status }}</dd>
         </div>
         <div>
-          <dt>Stage</dt>
+          <dt>阶段</dt>
           <dd>{{ activeTask.stage }}</dd>
         </div>
         <div>
-          <dt>Model</dt>
+          <dt>模型</dt>
           <dd>{{ activeTask.model }}</dd>
         </div>
         <div>
-          <dt>Updated</dt>
+          <dt>更新时间</dt>
           <dd>{{ activeTask.updatedAt }}</dd>
         </div>
       </dl>
       <div class="output-assets">
-        <h3>Outputs</h3>
+        <h3>生成结果</h3>
         <div v-if="activeTask.assets?.length" class="output-list">
           <article v-for="asset in activeTask.assets" :key="asset.assetId" class="output-row">
             <div>
@@ -110,18 +111,18 @@ defineEmits<{
                 {{ asset.mimeType }}
                 <template v-if="asset.width && asset.height"> / {{ asset.width }}x{{ asset.height }}</template>
               </small>
-              <button type="button" @click="$emit('downloadAsset', asset)">Download</button>
+              <button type="button" @click="$emit('downloadAsset', asset)">下载</button>
             </div>
           </article>
         </div>
-        <p v-else class="muted">No output assets.</p>
+        <p v-else class="muted">暂无生成结果。</p>
       </div>
     </template>
-    <p v-else class="muted">No active task.</p>
+    <p v-else class="muted">暂无当前任务。</p>
   </section>
 
   <section class="panel">
-    <h2>Recent Tasks</h2>
+    <h2>最近任务</h2>
     <div class="task-list">
       <button
         v-for="task in tasks"
@@ -131,7 +132,7 @@ defineEmits<{
         @click="$emit('selectTask', task)"
       >
         <span>{{ task.inputPayload.prompt }}</span>
-        <strong>{{ task.status }} / {{ task.projectId ?? 'none' }}</strong>
+        <strong>{{ task.status }} / {{ task.projectId ?? '未绑定项目' }}</strong>
       </button>
     </div>
   </section>

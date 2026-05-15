@@ -20,13 +20,13 @@ function selectedOptions(event: Event) {
 
 <template>
   <section class="panel asset-panel">
-    <h2>Assets</h2>
+    <h2>参考素材</h2>
     <label>
-      Upload Asset
+      上传素材
       <input type="file" :disabled="isUploadingAsset" @change="$emit('uploadAsset', $event)" />
     </label>
     <label>
-      Reference Assets
+      引用素材
       <select
         :value="selectedAssetIds"
         multiple
@@ -40,7 +40,7 @@ function selectedOptions(event: Event) {
     </label>
     <div class="asset-summary">
       <strong>{{ selectedAssetIds.length }}</strong>
-      <span>selected</span>
+      <span>已选择</span>
     </div>
   </section>
 </template>

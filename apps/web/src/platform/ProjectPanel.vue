@@ -19,21 +19,21 @@ defineEmits<{
 
 <template>
   <section class="panel project-panel">
-    <h2>Project</h2>
+    <h2>项目空间</h2>
     <label>
-      Active Project
+      当前项目
       <select
         :value="selectedProjectId"
         @change="$emit('update:selectedProjectId', ($event.target as HTMLSelectElement).value)"
       >
-        <option value="">No Project</option>
+        <option value="">不绑定项目</option>
         <option v-for="project in projects" :key="project.projectId" :value="project.projectId">
           {{ project.name }}
         </option>
       </select>
     </label>
     <label>
-      New Project
+      新项目名称
       <input
         :value="projectName"
         type="text"
@@ -41,7 +41,7 @@ defineEmits<{
       />
     </label>
     <label>
-      Description
+      项目描述
       <input
         :value="projectDescription"
         type="text"
@@ -49,7 +49,7 @@ defineEmits<{
       />
     </label>
     <button type="button" :disabled="isCreatingProject" @click="$emit('createProject')">
-      {{ isCreatingProject ? 'Creating...' : 'Create Project' }}
+      {{ isCreatingProject ? '创建中...' : '创建项目' }}
     </button>
   </section>
 </template>

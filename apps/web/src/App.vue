@@ -14,16 +14,16 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/a
 const authStorageKey = 'aigc.web.auth';
 const api = useApiClient(apiBaseUrl, authStorageKey);
 const webApi = createWebApi(api, apiBaseUrl);
-const phoneNumber = ref('13900139000');
-const password = ref('password123');
-const displayName = ref('Demo User');
+const phoneNumber = ref('');
+const password = ref('');
+const displayName = ref('');
 const projects = ref<Project[]>([]);
 const selectedProjectId = ref('');
-const projectName = ref('Default Project');
+const projectName = ref('');
 const projectDescription = ref('');
 const assets = ref<Asset[]>([]);
 const selectedAssetIds = ref<string[]>([]);
-const prompt = ref('a clean product photo of a ceramic cup');
+const prompt = ref('');
 const ratio = ref('1:1');
 const activeTaskId = ref('');
 const activeTask = ref<Task | null>(null);
@@ -44,6 +44,16 @@ let eventSource: EventSource | null = null;
 const activeTaskStatusLabel = computed(() => activeTask.value?.status ?? 'idle');
 const isAuthenticated = api.isAuthenticated;
 const currentUser = api.currentUser;
+const taskSummary = computed(() => {
+  const succeeded = tasks.value.filter((task) => task.status === 'succeeded').length;
+  const running = tasks.value.filter((task) => ['queued', 'running', 'retrying'].includes(task.status)).length;
+
+  return {
+    total: tasks.value.length,
+    succeeded,
+    running,
+  };
+});
 
 function resetMessages() {
   errorMessage.value = '';
@@ -56,6 +66,16 @@ function toErrorMessage(error: unknown, fallback: string) {
 
 async function authenticate(mode: 'login' | 'register') {
   resetMessages();
+
+  if (!phoneNumber.value.trim() || !password.value) {
+    errorMessage.value = '请输入手机号和密码';
+    return;
+  }
+
+  if (mode === 'register' && !displayName.value.trim()) {
+    errorMessage.value = '请输入显示名称';
+    return;
+  }
 
   try {
     await api.authenticate(mode, {
@@ -105,18 +125,24 @@ async function loadProjects() {
 
 async function createProject() {
   resetMessages();
+
+  if (!projectName.value.trim()) {
+    errorMessage.value = '请输入项目名称';
+    return;
+  }
+
   isCreatingProject.value = true;
 
   try {
     const project = await webApi.projects.create({
-      name: projectName.value,
-      description: projectDescription.value,
+      name: projectName.value.trim(),
+      description: projectDescription.value.trim(),
     });
     projects.value = [project, ...projects.value];
     selectedProjectId.value = project.projectId;
     projectName.value = '';
     projectDescription.value = '';
-    successMessage.value = 'Project created.';
+    successMessage.value = '项目已创建。';
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'Create project failed');
   } finally {
@@ -188,6 +214,12 @@ async function downloadAsset(asset: Asset) {
 
 async function createTask() {
   resetMessages();
+
+  if (!prompt.value.trim()) {
+    errorMessage.value = '请输入生成提示词';
+    return;
+  }
+
   isSubmitting.value = true;
 
   try {
@@ -195,7 +227,7 @@ async function createTask() {
       projectId: selectedProjectId.value || undefined,
       type: 'text_to_image',
       model: 'mock-image-v1',
-      prompt: prompt.value,
+      prompt: prompt.value.trim(),
       ratio: ratio.value,
       referenceAssetIds: selectedAssetIds.value,
     });
@@ -231,6 +263,10 @@ async function cancelActiveTask() {
     return;
   }
 
+  if (!window.confirm('确认取消当前任务？')) {
+    return;
+  }
+
   resetMessages();
   isCanceling.value = true;
 
@@ -247,6 +283,12 @@ async function cancelActiveTask() {
 
 async function changePassword() {
   resetMessages();
+
+  if (!currentPassword.value || newPassword.value.length < 8) {
+    errorMessage.value = '请输入当前密码，新密码至少 8 位';
+    return;
+  }
+
   isChangingPassword.value = true;
 
   try {
@@ -257,7 +299,7 @@ async function changePassword() {
 
     currentPassword.value = '';
     newPassword.value = '';
-    successMessage.value = 'Password changed. Please sign in again.';
+    successMessage.value = '密码已修改，请重新登录。';
     await signOut(false);
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'Change password failed');
@@ -329,14 +371,14 @@ onBeforeUnmount(() => {
     <section class="workspace">
       <header class="header">
         <div>
-          <p class="eyebrow">AIGC Web</p>
-          <h1>Generation Workspace</h1>
+          <p class="eyebrow">智枢工作台</p>
+          <h1>生成任务工作区</h1>
         </div>
         <div class="header-actions">
           <div class="status" :data-status="activeTaskStatusLabel">
             {{ activeTaskStatusLabel }}
           </div>
-          <button v-if="isAuthenticated" type="button" @click="signOut()">Sign Out</button>
+          <button v-if="isAuthenticated" type="button" @click="signOut()">退出</button>
         </div>
       </header>
 
@@ -352,9 +394,27 @@ onBeforeUnmount(() => {
       />
 
       <template v-else>
-        <div class="event-status">
-          User: <strong>{{ currentUser?.phoneNumber }}</strong> / SSE:
-          <strong>{{ eventSourceStatus }}</strong>
+        <div class="workspace-summary">
+          <div>
+            <span>当前用户</span>
+            <strong>{{ currentUser?.phoneNumber }}</strong>
+          </div>
+          <div>
+            <span>实时连接</span>
+            <strong>{{ eventSourceStatus }}</strong>
+          </div>
+          <div>
+            <span>任务总数</span>
+            <strong>{{ taskSummary.total }}</strong>
+          </div>
+          <div>
+            <span>执行中</span>
+            <strong>{{ taskSummary.running }}</strong>
+          </div>
+          <div>
+            <span>已成功</span>
+            <strong>{{ taskSummary.succeeded }}</strong>
+          </div>
         </div>
 
         <AccountPanel
@@ -405,7 +465,7 @@ onBeforeUnmount(() => {
 <style>
 .page {
   min-height: 100vh;
-  padding: 40px 20px;
+  padding: 32px 20px 48px;
   font-family:
     Inter,
     ui-sans-serif,
@@ -419,7 +479,7 @@ onBeforeUnmount(() => {
 }
 
 .workspace {
-  width: min(960px, 100%);
+  width: min(1180px, 100%);
   margin: 0 auto;
   display: grid;
   gap: 16px;
@@ -451,7 +511,7 @@ p {
 }
 
 h1 {
-  font-size: 36px;
+  font-size: 32px;
   line-height: 1.1;
 }
 
@@ -467,6 +527,35 @@ h2 {
   text-align: center;
   background: #fff;
   font-weight: 700;
+}
+
+.workspace-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.workspace-summary div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.workspace-summary span {
+  color: #687386;
+  font-size: 13px;
+}
+
+.workspace-summary strong {
+  overflow: hidden;
+  color: #17202a;
+  font-size: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status[data-status='succeeded'] {
@@ -504,6 +593,13 @@ select {
   font: inherit;
 }
 
+textarea:focus,
+input:focus,
+select:focus {
+  border-color: #2563eb;
+  outline: 2px solid #bfdbfe;
+}
+
 textarea {
   resize: vertical;
 }
@@ -524,6 +620,7 @@ textarea {
 .auth-panel {
   display: grid;
   gap: 12px;
+  width: min(460px, 100%);
 }
 
 .account-panel {
@@ -582,6 +679,11 @@ button {
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+.secondary-button {
+  background: #fff;
+  color: #17202a;
 }
 
 button:disabled {
@@ -645,6 +747,10 @@ dd {
   background: #fff;
   color: #17202a;
   text-align: left;
+}
+
+.task-row:hover {
+  border-color: #9aa7b7;
 }
 
 .task-row span {
@@ -723,6 +829,20 @@ dd {
     width: 100%;
   }
 
+  .workspace-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .account-panel,
+  .project-panel,
+  .asset-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .asset-summary {
+    min-width: 0;
+  }
+
   dl div {
     grid-template-columns: 1fr;
   }
@@ -733,6 +853,23 @@ dd {
 
   .output-actions {
     justify-content: start;
+  }
+}
+
+@media (min-width: 900px) {
+  .auth-panel {
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 900px) {
+  .workspace-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-panel,
+  .asset-panel {
+    grid-template-columns: 1fr;
   }
 }
 </style>
