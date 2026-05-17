@@ -48,9 +48,28 @@ export interface TaskRecord {
   createdAt: Date
   updatedAt: Date
   completedAt: Date | null
-  currentAttempt?: unknown
-  attempts?: unknown[]
+  currentAttempt?: TaskAttemptRecord | null
+  attempts?: TaskAttemptRecord[]
   assets?: TaskAssetRecord[]
+}
+
+export interface TaskAttemptRecord {
+  id: string
+  taskId: string
+  attemptNo: number
+  status: string
+  stage: string
+  provider: string | null
+  providerTaskId: string | null
+  failureCode: string | null
+  retryable: boolean
+  idempotencyKey: string
+  inputPayloadHash: string
+  rawError: unknown | null
+  startedAt: Date | null
+  endedAt: Date | null
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface TaskAssetRecord {

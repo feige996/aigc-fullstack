@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import type { AuthenticatedUser } from '../auth/auth.types'
 import type {
   GenerationRequestPayload,
+  TaskAttemptRecord,
   TaskAssetRecord,
   TaskRecord
 } from './generation.types'
@@ -23,12 +24,34 @@ export function serializeTask(task: TaskRecord) {
     inputPayload: task.inputPayload,
     resultPayload: task.resultPayload,
     usagePayload: task.usagePayload,
-    currentAttempt: task.currentAttempt,
-    attempts: task.attempts,
+    currentAttempt: task.currentAttempt ? serializeTaskAttempt(task.currentAttempt) : task.currentAttempt,
+    attempts: task.attempts?.map((attempt) => serializeTaskAttempt(attempt)),
     assets: task.assets?.map((asset) => serializeGenerationAsset(asset)),
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
     completedAt: task.completedAt?.toISOString() ?? null
+  }
+}
+
+function serializeTaskAttempt(attempt: TaskAttemptRecord) {
+  return {
+    id: attempt.id,
+    attemptId: attempt.id,
+    taskId: attempt.taskId,
+    attemptNo: attempt.attemptNo,
+    status: attempt.status,
+    stage: attempt.stage,
+    provider: attempt.provider,
+    providerTaskId: attempt.providerTaskId,
+    failureCode: attempt.failureCode,
+    retryable: attempt.retryable,
+    idempotencyKey: attempt.idempotencyKey,
+    inputPayloadHash: attempt.inputPayloadHash,
+    rawError: attempt.rawError,
+    startedAt: attempt.startedAt?.toISOString() ?? null,
+    endedAt: attempt.endedAt?.toISOString() ?? null,
+    createdAt: attempt.createdAt.toISOString(),
+    updatedAt: attempt.updatedAt.toISOString()
   }
 }
 

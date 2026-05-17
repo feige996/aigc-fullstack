@@ -5,6 +5,7 @@ import {
   rabbitExchanges,
   rabbitQueues,
   rabbitRoutingKeys,
+  type TaskResultMessage,
   taskStatuses
 } from './index.js'
 
@@ -23,6 +24,30 @@ test('task statuses include terminal states used by polling clients', () => {
   assert.ok(taskStatuses.includes('final_failed'))
   assert.ok(taskStatuses.includes('canceled'))
   assert.ok(taskStatuses.includes('expired'))
+})
+
+test('failed task result messages support structured raw error details', () => {
+  const message: TaskResultMessage = {
+    traceId: 'trace_1',
+    taskId: 'task_1',
+    attemptId: 'attempt_1',
+    status: 'failed',
+    provider: 'mock',
+    providerTaskId: null,
+    outputs: [],
+    error: {
+      code: 'PROVIDER_FAILED',
+      message: 'provider failed',
+      retryable: true,
+      type: 'ProviderError',
+      class: 'src.providers.base.ProviderError',
+      stage: 'provider_generate',
+      provider: 'mock'
+    }
+  }
+
+  assert.equal(message.error?.stage, 'provider_generate')
+  assert.equal(message.error?.provider, 'mock')
 })
 
 test('AIGC generation feature declares the expected app and admin entries', () => {

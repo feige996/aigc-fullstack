@@ -47,21 +47,29 @@ def test_build_success_result_preserves_task_identity_and_provider_output() -> N
     assert result.message.status == "succeeded"
     assert result.message.trace_id == "trace_1"
     assert result.message.provider == "mock-provider"
+    assert result.message.provider_task_id is None
     assert result.message.outputs[0].object_path.endswith("/output.png")
     assert result.message.error is None
 
 
-def test_build_failed_result_returns_retryable_provider_error() -> None:
+def test_build_failed_result_returns_structured_provider_error() -> None:
     result = build_failed_result(
         make_task(),
         ProviderError(code="PROVIDER_TIMEOUT", message="provider timed out", retryable=True),
+        provider="mock",
+        stage="provider_generate",
     )
 
     assert result.routing_key == TASK_FAILED_ROUTING_KEY
     assert result.message.status == "failed"
+    assert result.message.provider == "mock"
     assert result.message.outputs == []
     assert result.message.error == {
         "code": "PROVIDER_TIMEOUT",
         "message": "provider timed out",
         "retryable": True,
+        "type": "ProviderError",
+        "class": "src.providers.base.ProviderError",
+        "stage": "provider_generate",
+        "provider": "mock",
     }

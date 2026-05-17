@@ -61,6 +61,8 @@ export class GenerationResultConsumerService implements OnModuleInit {
         data: {
           status: 'succeeded',
           stage: 'completed',
+          provider: message.provider,
+          providerTaskId: message.providerTaskId ?? null,
           endedAt: new Date()
         }
       })
@@ -134,8 +136,10 @@ export class GenerationResultConsumerService implements OnModuleInit {
         data: {
           status: 'failed',
           failureCode: 'PROVIDER_FAILED',
+          stage: message.error?.stage ?? 'completed',
+          provider: message.error?.provider ?? message.provider,
           retryable: message.error?.retryable ?? true,
-          rawError: message.error ?? undefined,
+          rawError: message.error ? toPrismaJson(message.error) : undefined,
           endedAt: new Date()
         }
       })

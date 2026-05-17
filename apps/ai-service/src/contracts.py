@@ -50,6 +50,7 @@ class TaskResultMessage(BaseModel):
     attempt_id: str = Field(alias="attemptId")
     status: str
     provider: str
+    provider_task_id: str | None = Field(default=None, alias="providerTaskId")
     outputs: list[TaskResultOutput]
     usage: TaskResultUsage | None = None
     error: dict | None = None

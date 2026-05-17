@@ -199,6 +199,7 @@ export interface TaskResultMessage {
   attemptId: string;
   status: 'succeeded' | 'failed';
   provider: string;
+  providerTaskId?: string | null;
   outputs: Array<{
     type: 'image' | 'video';
     objectPath: string;
@@ -215,6 +216,10 @@ export interface TaskResultMessage {
     code: string;
     message: string;
     retryable: boolean;
+    type?: string;
+    class?: string;
+    stage?: string;
+    provider?: string;
   } | null;
 }
 

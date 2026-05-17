@@ -113,7 +113,8 @@ class ImageGenerateWorker:
                 provider_result = await self.provider_registry.generate(task)
                 worker_result = build_success_result(task, provider_result)
             except ProviderError as error:
-                worker_result = build_failed_result(task, error)
+                provider = self.provider_registry.provider_name_from_model(task.model)
+                worker_result = build_failed_result(task, error, provider=provider, stage="provider_generate")
 
             await result_exchange.publish(
                 aio_pika.Message(

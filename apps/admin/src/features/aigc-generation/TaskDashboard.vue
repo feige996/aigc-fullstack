@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
-import type { Asset, Task, TaskStatus } from '../../types'
+import { computed } from 'vue'
+import type { Asset, GenerationAttempt, Task, TaskStatus } from '../../types'
 import type { TagProps } from 'element-plus'
 
 type TagType = NonNullable<TagProps['type']>
@@ -52,6 +53,27 @@ const taskStatusOptions: TaskStatus[] = [
   'expired',
 ]
 
+const timelineAttempts = computed(() => {
+  return [...(props.selectedTask?.attempts ?? [])].sort(compareAttempts)
+})
+
+function compareAttempts(left: GenerationAttempt, right: GenerationAttempt) {
+  if (left.attemptNo !== right.attemptNo) {
+    return left.attemptNo - right.attemptNo
+  }
+
+  return timeValue(left.createdAt) - timeValue(right.createdAt)
+}
+
+function timeValue(value: string | null | undefined) {
+  if (!value) {
+    return 0
+  }
+
+  const time = new Date(value).getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
 function formatJson(value: unknown) {
   if (value === undefined) {
     return 'undefined'
@@ -87,6 +109,20 @@ function formatBytes(value: number | null | undefined) {
 
 function assetDimensions(asset: Asset) {
   return asset.width && asset.height ? `${asset.width}x${asset.height}` : '-'
+}
+
+function formatNullable(value: string | null | undefined) {
+  return value || '-'
+}
+
+function hasRawError(attempt: GenerationAttempt) {
+  return attempt.rawError !== null && attempt.rawError !== undefined
+}
+
+function rawErrorText(attempt: GenerationAttempt) {
+  return typeof attempt.rawError === 'string'
+    ? attempt.rawError
+    : formatJson(attempt.rawError)
 }
 
 async function copyText(label: string, value: string | null | undefined) {
@@ -303,6 +339,103 @@ async function copyText(label: string, value: string | null | undefined) {
           </el-collapse-item>
         </el-collapse>
 
+        <h2>Timeline</h2>
+        <el-empty
+          v-if="timelineAttempts.length === 0"
+          description="No attempts"
+          :image-size="80"
+        />
+        <div v-else class="attempt-timeline">
+          <article
+            v-for="attempt in timelineAttempts"
+            :key="attempt.id"
+            class="attempt-event"
+          >
+            <div class="attempt-event-marker" aria-hidden="true" />
+            <div class="attempt-event-body">
+              <div class="attempt-event-header">
+                <div class="attempt-title">
+                  <strong>Attempt {{ attempt.attemptNo }}</strong>
+                  <el-tag size="small" effect="plain">
+                    {{ attempt.status }}
+                  </el-tag>
+                </div>
+                <div class="attempt-actions">
+                  <el-button
+                    size="small"
+                    text
+                    @click="copyText('Attempt ID', attempt.id)"
+                  >
+                    Copy Attempt ID
+                  </el-button>
+                  <el-button
+                    size="small"
+                    text
+                    :disabled="!attempt.providerTaskId"
+                    @click="
+                      copyText('Provider task ID', attempt.providerTaskId)
+                    "
+                  >
+                    Copy Provider Task
+                  </el-button>
+                </div>
+              </div>
+
+              <dl class="attempt-grid">
+                <div>
+                  <dt>Stage</dt>
+                  <dd>{{ formatNullable(attempt.stage) }}</dd>
+                </div>
+                <div>
+                  <dt>Provider</dt>
+                  <dd>{{ formatNullable(attempt.provider) }}</dd>
+                </div>
+                <div>
+                  <dt>Provider Task ID</dt>
+                  <dd>
+                    <span class="break-text">
+                      {{ formatNullable(attempt.providerTaskId) }}
+                    </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Failure Code</dt>
+                  <dd>{{ formatNullable(attempt.failureCode) }}</dd>
+                </div>
+                <div>
+                  <dt>Started</dt>
+                  <dd>{{ formatNullable(attempt.startedAt) }}</dd>
+                </div>
+                <div>
+                  <dt>Ended</dt>
+                  <dd>{{ formatNullable(attempt.endedAt) }}</dd>
+                </div>
+                <div>
+                  <dt>Updated</dt>
+                  <dd>{{ formatNullable(attempt.updatedAt) }}</dd>
+                </div>
+              </dl>
+
+              <el-collapse v-if="hasRawError(attempt)" class="raw-error">
+                <el-collapse-item title="rawError" :name="attempt.id">
+                  <div class="raw-error-toolbar">
+                    <el-button
+                      size="small"
+                      text
+                      @click="copyText('rawError', rawErrorText(attempt))"
+                    >
+                      Copy rawError
+                    </el-button>
+                  </div>
+                  <pre class="json-block raw-error-block">{{
+                    rawErrorText(attempt)
+                  }}</pre>
+                </el-collapse-item>
+              </el-collapse>
+            </div>
+          </article>
+        </div>
+
         <h2>Attempts</h2>
         <el-table :data="selectedTask.attempts ?? []" size="small" border>
           <el-table-column
@@ -440,5 +573,119 @@ async function copyText(label: string, value: string | null | undefined) {
   color: #1f2937;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.attempt-timeline {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.attempt-event {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.attempt-event::before {
+  position: absolute;
+  top: 18px;
+  bottom: -18px;
+  left: 8px;
+  width: 1px;
+  background: #d1d5db;
+  content: '';
+}
+
+.attempt-event:last-child::before {
+  display: none;
+}
+
+.attempt-event-marker {
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  margin-top: 9px;
+  border: 2px solid #409eff;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.attempt-event-body {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.attempt-event-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.attempt-title,
+.attempt-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attempt-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 12px 0 0;
+}
+
+.attempt-grid div {
+  min-width: 0;
+}
+
+.attempt-grid dt {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.attempt-grid dd {
+  min-width: 0;
+  margin: 3px 0 0;
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.break-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.raw-error {
+  margin-top: 12px;
+}
+
+.raw-error-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.raw-error-block {
+  max-height: 240px;
+}
+
+@media (max-width: 720px) {
+  .attempt-event-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .attempt-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

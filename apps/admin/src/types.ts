@@ -28,9 +28,13 @@ export interface GenerationAttempt {
   attemptNo: number
   status: string
   stage: string
+  provider: string | null
+  providerTaskId: string | null
   failureCode: string | null
+  rawError: unknown | null
   idempotencyKey: string
   createdAt: string
+  startedAt: string | null
   updatedAt: string
   endedAt: string | null
 }
